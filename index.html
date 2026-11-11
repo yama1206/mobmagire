@@ -58,6 +58,7 @@ input[type=range]{padding:0;width:180px}
  <div class="row"><label>なまえ</label><input id="inName" maxlength="8"></div>
  <div class="lbl">スキン（NPCの見た目にも使われます）</div>
  <div id="skinsT" class="skins"></div>
+ <div class="row"><b id="crT" style="color:#ffd75e"></b><button id="bShopT" class="sub">ショップ</button></div>
  <div class="row"><button id="bSolo">ひとりで遊ぶ（CPU）</button><button id="bHost">部屋を作る</button></div>
  <div class="row"><input id="inCode" placeholder="部屋コード" maxlength="5" style="width:130px;text-transform:uppercase"><button id="bJoin">部屋に入る</button></div>
  <div id="status" class="status"></div>
@@ -73,7 +74,7 @@ input[type=range]{padding:0;width:180px}
 <div id="lobby" class="screen"><div class="panel">
  <h2 id="lbCode"></h2>
  <div class="lbl">メンバー</div><div id="lbMem" class="mem"></div>
- <div class="lbl">自分のスキン</div><div id="skinsL" class="skins"></div>
+ <div class="row"><span class="lbl" style="margin:0">自分のスキン</span><b id="crL" style="color:#ffd75e"></b><button id="bShopL" class="sub" style="padding:4px 10px;font-size:13px">ショップ</button></div><div id="skinsL" class="skins"></div>
  <div id="lbHost">
   <div class="row"><label>モード</label><select id="selMode"></select></div>
   <div id="modeDesc" class="desc"></div>
@@ -85,6 +86,13 @@ input[type=range]{padding:0;width:180px}
  <div class="row"><button id="bStart">スタート！</button><button id="bBack" class="sub">タイトルへ</button></div>
 </div></div>
 
+<div id="shop" class="screen"><div class="panel">
+ <h2>ショップ　<span id="shopCr"></span></h2>
+ <div class="desc">試合に勝つと王冠が1個もらえます。王冠でスキンを解放できます。</div>
+ <div id="shopList" class="skins"></div>
+ <div class="row"><button id="bShopBack" class="sub">もどる</button></div>
+</div></div>
+
 <div id="result" class="screen"><div class="panel">
  <h2 id="rsTitle"></h2><div id="rsLines" class="desc"></div>
  <div class="row"><button id="bRsLobby">ロビーへ戻る</button><button id="bRsTitle" class="sub">タイトルへ</button></div>
@@ -93,7 +101,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.3.0';
+const GAME_VERSION='0.4.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -117,6 +125,8 @@ const SKINS=[
  {n:'茶色コート',hair:'#bb8844',shirt:'#8a5a30',pants:'#2a2a2a',hat:'#5a3a20',tone:'#f0c49a'},
  {n:'ボーダー',hair:'#222',shirt:'#ffffff',stripe:'#2a3a8a',pants:'#5a6a8a',tone:'#e8b98e'}
 ];
+// スキンの解放に必要な王冠（0は最初から使える）
+const PRICES=[0,0,0,0,0,0,1,1,2,2,3,3];
 const $=id=>document.getElementById(id);
 const rnd=Math.random,rr=(a,b)=>a+rnd()*(b-a),ri=n=>Math.floor(rnd()*n),pick=a=>a[ri(a.length)];
 const clamp=(v,a,b)=>v<a?a:v>b?b:v;
@@ -163,28 +173,28 @@ const MODES=[
   def:{npc:40,time:300,respawn:null,npcOnHit:'stay',npcReact:'flee',refill:false,skinMode:'uniform',items:true},
   isEnemy:()=>true,
   info:G=>`残り ${alive(G).length}人`,
-  check(G){const a=alive(G);if(active(G).length>1&&a.length<=1)return{title:a.length?`${a[0].name} の勝ち！`:'引き分け',lines:resLines(G)};return null},
-  timeUp(G){const a=alive(G);return{title:'時間切れ！',lines:[`生き残り：${a.map(p=>p.name).join('、')||'なし'}`,...resLines(G)]}}},
+  check(G){const a=alive(G);if(active(G).length>1&&a.length<=1)return{title:a.length?`${a[0].name} の勝ち！`:'引き分け',lines:resLines(G),w:a.map(p=>p.pid)};return null},
+  timeUp(G){const a=alive(G);return{title:'時間切れ！',lines:[`生き残り：${a.map(p=>p.name).join('、')||'なし'}`,...resLines(G)],w:a.map(p=>p.pid)}}},
  {id:'team',name:'チームバトル',ready:1,knowsMates:true,desc:'赤と青のチーム対決。味方は足元の輪で分かります。相手を10回倒すか、時間終了時に多い方の勝ち。味方をパンチすると自分がよろめきます。',
   def:{npc:40,time:240,respawn:5,npcOnHit:'stay',npcReact:'fall',refill:false,skinMode:'uniform',items:true,goal:10},
   setup(G){const a=[...G.plist].sort(()=>rnd()-.5);a.forEach((p,i)=>p.team=i%2);G.ts=[0,0]},
   isEnemy:(G,a,b)=>a.team!==b.team,
   onKill(G,a,v){if(a&&a.team!==v.team)G.ts[a.team]++},
   info:G=>`赤 ${G.ts[0]} − ${G.ts[1]} 青（${G.set.goal}点先取）`,
-  check(G){for(let t=0;t<2;t++)if(G.ts[t]>=G.set.goal)return{title:(t?'青':'赤')+'チームの勝ち！',lines:teamLines(G)};return null},
-  timeUp(G){const[r,b]=G.ts;return{title:r===b?'引き分け！':(r>b?'赤':'青')+'チームの勝ち！',lines:teamLines(G)}}},
+  check(G){for(let t=0;t<2;t++)if(G.ts[t]>=G.set.goal)return{title:(t?'青':'赤')+'チームの勝ち！',lines:teamLines(G),w:G.plist.filter(p=>p.team===t).map(p=>p.pid)};return null},
+  timeUp(G){const[r,b]=G.ts;return{title:r===b?'引き分け！':(r>b?'赤':'青')+'チームの勝ち！',lines:teamLines(G),w:r===b?[]:G.plist.filter(p=>p.team===(r>b?0:1)).map(p=>p.pid)}}},
  {id:'thief',name:'泥棒だーれだ',ready:1,desc:'1人だけが泥棒（本人にだけ通知）。泥棒は宝箱の近くでKを押して盗みます。3つ盗めば泥棒の勝ち。警察は泥棒をパンチすれば勝ち。警察どうしでパンチすると自分がよろめきます。',
   def:{npc:40,time:240,respawn:5,npcOnHit:'stay',npcReact:'flee',refill:false,skinMode:'uniform',items:true,goal:3},
   setup(G){const th=pick(G.plist);G.plist.forEach(p=>p.role=p===th?'thief':'police');G.stolen=0;G.thief=th;G.objs.chests=G.map.chestSpots.map(s=>({x:s.x,y:s.y,open:false}))},
   isEnemy:(G,a,b)=>a.role!==b.role,
-  onKill(G,a,v){if(v.role==='thief')G.pend={title:'警察の勝ち！',lines:[`泥棒は ${v.name}（${SKINS[v.skin].n}）でした`,`捕まえたのは ${a?a.name:'?'}`]}},
+  onKill(G,a,v){if(v.role==='thief')G.pend={title:'警察の勝ち！',lines:[`泥棒は ${v.name}（${SKINS[v.skin].n}）でした`,`捕まえたのは ${a?a.name:'?'}`],w:G.plist.filter(p=>p.role==='police').map(p=>p.pid)}},
   interact(G,p,e){if(p.role!=='thief')return false;for(const c of G.objs.chests)if(!c.open&&dist(e,c)<36){c.open=true;G.stolen++;G.lastSteal={x:c.x,y:c.y,t:G.time};toastAll(`宝箱が盗まれた！（${G.stolen}/${G.set.goal}）`);return true}return false},
   cpuGoal(G,p,e){if(p.role==='thief'){let b=null,bd=1e9;for(const c of G.objs.chests)if(!c.open){const d=dist(e,c);if(d<bd){bd=d;b=c}}return b}
    if(G.lastSteal&&G.lastSteal.t-G.time<15&&dist(e,G.lastSteal)>60)return G.lastSteal;return null},
   info:G=>`盗まれた宝箱 ${G.stolen}/${G.set.goal}`,
-  check(G){if(G.pend)return G.pend;if(G.stolen>=G.set.goal)return{title:'泥棒の勝ち！',lines:[`泥棒は ${G.thief.name}（${SKINS[G.thief.skin].n}）でした`]};
+  check(G){if(G.pend)return G.pend;if(G.stolen>=G.set.goal)return{title:'泥棒の勝ち！',lines:[`泥棒は ${G.thief.name}（${SKINS[G.thief.skin].n}）でした`],w:[G.thief.pid]};
    if(G.thief.left)return{title:'泥棒が退出しました',lines:[]};return null},
-  timeUp(G){return{title:'時間切れ！警察の勝ち！',lines:[`泥棒は ${G.thief.name}（${SKINS[G.thief.skin].n}）でした`]}}},
+  timeUp(G){return{title:'時間切れ！警察の勝ち！',lines:[`泥棒は ${G.thief.name}（${SKINS[G.thief.skin].n}）でした`],w:G.plist.filter(p=>p.role==='police').map(p=>p.pid)}}},
  {id:'treasure',name:'お宝争奪戦',ready:1,desc:'マップに出るコインの近くでKを押して拾います。パンチされると持っているコインの半分を落とします。時間終了時に一番多い人の勝ち。このモードではNPCはパンチされると消え、補充されます。',
   def:{npc:40,time:180,respawn:3,npcOnHit:'vanish',npcReact:'flee',refill:true,skinMode:'prop',items:true,coins:8},
   isEnemy:()=>true,
@@ -194,7 +204,7 @@ const MODES=[
   onKill(G,a,v,ve){const n=Math.floor(v.score/2);v.score-=n;for(let i=0;i<n;i++){const an=rnd()*6.28,r=rr(15,50);let x=ve.x+Math.cos(an)*r,y=ve.y+Math.sin(an)*r;if(isBlocked(G.map,x,y,6)){x=ve.x;y=ve.y}G.objs.coins.push({x,y})}},
   cpuGoal(G,p,e){let b=null,bd=500;for(const c of G.objs.coins){const d=dist(e,c);if(d<bd){bd=d;b=c}}return b},
   info(G,p){const t=[...active(G)].sort((a,b)=>b.score-a.score)[0];return`あなたのコイン ${p.score}枚　トップ：${t?t.name+' '+t.score+'枚':'-'}`},
-  timeUp(G){const r=[...active(G)].sort((a,b)=>b.score-a.score);return{title:r[0]?`${r[0].name} の勝ち！`:'終了',lines:r.map((p,i)=>`${i+1}位 ${p.name}　${p.score}枚`)}}},
+  timeUp(G){const r=[...active(G)].sort((a,b)=>b.score-a.score);return{title:r[0]?`${r[0].name} の勝ち！`:'終了',lines:r.map((p,i)=>`${i+1}位 ${p.name}　${p.score}枚`),w:r.filter(p=>p.score>0&&p.score===r[0].score).map(p=>p.pid)}}},
  {id:'vip',name:'VIPを守れ（準備中）',ready:0,desc:'準備中です'},
  {id:'hide',name:'かくれんぼ（準備中）',ready:0,desc:'準備中です'},
  {id:'area',name:'エリア争奪戦（準備中）',ready:0,desc:'準備中です'},
@@ -204,12 +214,19 @@ const MODES=[
 // ================= 通信・ロビー =================
 let peer=null,isHost=false,myPid='h',conns={},hostConn=null,pidSeq=0;
 let myName=lsGet('mm_name','')||('ゲスト'+(100+ri(900))),mySkin=+lsGet('mm_skin',ri(SKINS.length))||0;
+let myCrowns=+lsGet('mm_crowns',0)||0;
+let myOwned=(()=>{try{return JSON.parse(lsGet('mm_owned','[]'))||[]}catch(e){return[]}})();
+const isOwned=i=>PRICES[i]===0||myOwned.includes(i);
+if(!isOwned(mySkin))mySkin=0;
+function saveWallet(){lsSet('mm_crowns',myCrowns);lsSet('mm_owned',JSON.stringify(myOwned));updCrowns()}
+function updCrowns(){for(const id of ['crT','crL','shopCr'])if($(id))$(id).textContent='👑 '+myCrowns}
+let shopOpen=false;
 const LB={code:'',members:[],mode:'br',npc:40,cpu:3,time:300,solo:false};
 const inputs={};
 let phase='title',G=null,CL=null;
 
 function setStatus(s){$('status').textContent=s}
-function showScreen(id){for(const s of ['title','lobby','result'])$(s).classList.toggle('on',s===id);
+function showScreen(id){for(const s of ['title','lobby','result','shop'])$(s).classList.toggle('on',s===id);
  $('hud').style.display=(phase==='game'||phase==='result')?'block':'none';
  $('touch').style.display=(phase==='game'&&matchMedia('(pointer:coarse)').matches)?'block':'none'}
 function genCode(){const c='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++)s+=c[ri(c.length)];return s}
@@ -253,7 +270,7 @@ function applyModeDef(){const md=MODES.find(m=>m.id===LB.mode);if(md&&md.def){LB
 function onMsg(m){
  if(!m||!m.t)return;
  switch(m.t){
-  case 'lobby':Object.assign(LB,m.lb);myPid=m.you;if(phase!=='game'&&phase!=='result')showLobby();break;
+  case 'lobby':Object.assign(LB,m.lb);myPid=m.you;if(phase!=='game'&&phase!=='result'){if(shopOpen){phase='lobby'}else showLobby()}break;
   case 'tolobby':showLobby();break;
   case 'wait':showLobby();toast('試合中です。次の試合から参加できます');break;
   case 'start':clientStart(m);break;
@@ -268,9 +285,19 @@ function onMsg(m){
 function toTitle(){if(G&&G.iv)clearInterval(G.iv);G=null;CL=null;if(peer){try{peer.destroy()}catch(e){}}peer=null;hostConn=null;conns={};phase='title';showScreen('title')}
 
 // ---- ロビーUI ----
-function buildSkinGrid(el,onPick){el.innerHTML='';SKINS.forEach((s,i)=>{const d=document.createElement('div');d.className='skin'+(i===mySkin?' sel':'');
+function buildSkinGrid(el,onPick){el.innerHTML='';SKINS.forEach((s,i)=>{const own=isOwned(i);const d=document.createElement('div');d.className='skin'+(i===mySkin?' sel':'');if(!own)d.style.opacity='.45';
  const cv2=document.createElement('canvas');cv2.width=54;cv2.height=58;const c2=cv2.getContext('2d');drawChar(c2,27,54,i,Math.PI/2,0,0,0,0,1.25);
- d.appendChild(cv2);d.appendChild(document.createTextNode(s.n));d.onclick=()=>{mySkin=i;lsSet('mm_skin',i);[...el.children].forEach((c,j)=>c.classList.toggle('sel',j===i));onPick&&onPick(i)};el.appendChild(d)})}
+ d.appendChild(cv2);d.appendChild(document.createTextNode(own?s.n:'🔒👑'+PRICES[i]));
+ d.onclick=()=>{if(!own){openShop();return}mySkin=i;lsSet('mm_skin',i);[...el.children].forEach((c,j)=>c.classList.toggle('sel',j===i));onPick&&onPick(i)};el.appendChild(d)})}
+function openShop(){shopOpen=true;showScreen('shop');renderShop()}
+function closeShop(){shopOpen=false;if(phase==='lobby')showLobby();else{showScreen('title');buildSkinGrid($('skinsT'))}}
+function renderShop(){updCrowns();const el=$('shopList');el.innerHTML='';
+ SKINS.forEach((s,i)=>{if(PRICES[i]===0)return;const own=isOwned(i);const d=document.createElement('div');d.className='skin';d.style.width='84px';
+  const cv2=document.createElement('canvas');cv2.width=54;cv2.height=58;drawChar(cv2.getContext('2d'),27,54,i,Math.PI/2,0,0,0,0,1.25);d.appendChild(cv2);
+  d.appendChild(document.createTextNode(s.n));const bt=document.createElement('button');bt.style.cssText='padding:4px 8px;font-size:12px;margin-top:3px';
+  if(own){bt.textContent='解放済み';bt.disabled=true}else{bt.textContent='👑'+PRICES[i]+' で解放';bt.disabled=myCrowns<PRICES[i];
+   bt.onclick=()=>{if(myCrowns<PRICES[i])return;if(!confirm(`王冠${PRICES[i]}個で「${s.n}」を解放しますか？`))return;myCrowns-=PRICES[i];myOwned.push(i);saveWallet();renderShop()}}
+  d.appendChild(document.createElement('br'));d.appendChild(bt);el.appendChild(d)})}
 function showLobby(){phase='lobby';showScreen('lobby');buildSkinGrid($('skinsL'),i=>{if(isHost){const me=LB.members.find(m=>m.pid===myPid);if(me){me.skin=i;lobbyBroadcast();renderLobby()}}else if(hostConn)hostConn.send({t:'skin',skin:i})});renderLobby()}
 function renderLobby(){
  $('lbCode').textContent=LB.solo?'ひとりモード':'部屋コード：'+LB.code;
@@ -446,7 +473,7 @@ function sendSnaps(){
 }
 function endGame(res){G.over=true;clearInterval(G.iv);
  const tot=G.plist.reduce((a,p)=>a+(p.punches||0),0);
- res.lines=[...(res.lines||[]),'<br><b>👀 画面に映ったパンチ</b>',...G.plist.map(p=>{const all=tot-(p.punches||0),sn=p.seen||0;return`${p.name}${p.cpu?'(CPU)':''}　${sn}回 / 全体 ${all}回（見逃し ${all-sn}回）`})];for(const p of G.plist)if(!p.cpu&&!p.left)sendTo(p.pid,{t:'end',title:res.title,lines:res.lines})}
+ res.lines=[...(res.lines||[]),'<br><b>👀 画面に映ったパンチ</b>',...G.plist.map(p=>{const all=tot-(p.punches||0),sn=p.seen||0;return`${p.name}${p.cpu?'(CPU)':''}　${sn}回 / 全体 ${all}回（見逃し ${all-sn}回）`})];for(const p of G.plist)if(!p.cpu&&!p.left)sendTo(p.pid,{t:'end',title:res.title,lines:res.lines,crown:(res.w||[]).includes(p.pid)})}
 function hostToLobby(){if(G&&G.iv)clearInterval(G.iv);G=null;bcast({t:'tolobby'});lobbyBroadcast()}
 
 // ================= クライアント =================
@@ -472,7 +499,8 @@ function updateHud(){
  if(top!==CL.hudT){$('hudTop').innerHTML=top;CL.hudT=top}if(bot!==CL.hudB){$('hudBot').innerHTML=bot;CL.hudB=bot}
 }
 function toast(s){const t=$('toasts');while(t.children.length>3)t.firstChild.remove();const d=document.createElement('div');d.className='toast';d.textContent=s;t.appendChild(d);t.appendChild(document.createElement('br'));setTimeout(()=>{d.remove()},3000);setTimeout(()=>{if(t.lastChild&&t.lastChild.tagName==='BR'&&t.children.length&&t.firstChild.tagName==='BR')t.firstChild.remove()},3100)}
-function showResult(m){phase='result';showScreen('result');$('rsTitle').textContent=m.title;$('rsLines').innerHTML=(m.lines||[]).join('<br>');
+function showResult(m){phase='result';showScreen('result');$('rsTitle').textContent=m.title;let cw='';if(m.crown){myCrowns++;saveWallet();cw=`<div style="font-size:20px;color:#ffd75e;margin:6px 0"><b>👑 王冠を1個手に入れた！（所持 ${myCrowns}個）</b></div>`}
+ $('rsLines').innerHTML=cw+(m.lines||[]).join('<br>');
  $('bRsLobby').style.display=isHost?'':'none';$('rsWait').textContent=isHost?'':'ホストがロビーに戻るのを待っています…';$('touch').style.display='none'}
 
 // ================= 入力 =================
@@ -604,6 +632,7 @@ function frame(){requestAnimationFrame(frame);const now=performance.now(),dt=Mat
 $('ver').textContent='ver '+GAME_VERSION;
 $('inName').value=myName;$('inName').oninput=()=>{myName=cleanName($('inName').value);lsSet('mm_name',myName)};
 buildSkinGrid($('skinsT'));
+$('bShopT').onclick=openShop;$('bShopL').onclick=openShop;$('bShopBack').onclick=closeShop;updCrowns();
 $('bSolo').onclick=soloStart;$('bHost').onclick=hostRoom;$('bJoin').onclick=joinRoom;
 $('selMode').onchange=()=>{LB.mode=$('selMode').value;applyModeDef();lobbyBroadcast();renderLobby()};
 $('rngNpc').oninput=()=>{LB.npc=+$('rngNpc').value;lobbyBroadcast();renderLobby()};
