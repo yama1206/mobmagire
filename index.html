@@ -65,7 +65,7 @@ input[type=range]{padding:0;width:180px}
   キーボード：移動 WASD/矢印　走る Shift　パンチ J/スペース　調べる・アイテム K/E<br>
   コントローラー：左スティック移動　下ボタン/RT パンチ　右・左ボタン 調べる・アイテム　RB/LT 走る<br>
   ・プレイヤーもNPCも同じ見た目。パンチできるのはプレイヤーだけ。<br>
-  ・パンチを<b>自分の目で見た</b>相手だけ、頭に <b style="color:#ff5555">！</b> が付きます。<br>
+  ・誰がパンチしたかは<b>自分の目で見て覚えて</b>ください。<br>
   ・NPCをパンチすると3秒よろめいて動けません。パンチされたプレイヤーは一撃でダウン。
  </div>
 </div></div>
@@ -93,7 +93,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.1.0';
+const GAME_VERSION='0.2.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -359,7 +359,7 @@ function doAction(p,e){
 function useItem(p,e){
  const it=p.item;p.item=0;
  if(it===1){const pool=G.skinUniq.length>1?G.skinUniq.filter(s=>s!==e.skin):SKINS.map((s,i)=>i).filter(i=>i!==e.skin);e.skin=pick(pool);p.curSkin=e.skin;
-  for(const q of G.plist){if(q===p||!q.known.has(e.id))continue;const v=q.alive&&G.em.get(q.eid);if(!v||!canSee(v,e)){q.known.delete(e.id);if(!q.cpu)sendTo(q.pid,{t:'fg',id:e.id})}}
+  for(const q of G.plist){if(q===p||!q.known.has(e.id))continue;const v=q.alive&&G.em.get(q.eid);if(!v||!canSee(v,e)){q.known.delete(e.id)}}
   toastP(p,`変装した！（${SKINS[e.skin].n}）`)}
  else if(it===2){G.objs.smokes.push({x:e.x,y:e.y,r:110,t:7});toastP(p,'煙玉を使った！')}
 }
@@ -390,7 +390,7 @@ function eliminate(vp,ve,ap){
 function witness(){
  for(const a of G.ents){if(!(a.pv>0)||!a.pid)continue;
   for(const p of G.plist){if(!p.alive||p.pid===a.pid||p.known.has(a.id))continue;const v=G.em.get(p.eid);if(!v)continue;
-   if(canSee(v,a)){p.known.add(a.id);if(!p.cpu){sendTo(p.pid,{t:'rv',id:a.id});toastP(p,'👀 パンチを目撃した！')}}}}
+   if(canSee(v,a))p.known.add(a.id)}}
 }
 function stuckCheck(){
  for(const e of G.ents){
@@ -577,7 +577,7 @@ function draw(dt,now){
  for(let i=0;i<o.length;i+=3){const ty=o[i],x=o[i+1],y=o[i+2];if(ty===5||!inV(x,y,40))continue;L.push([y,()=>{const[a,b]=S(x,y);drawObj(c,ty,a,b,now)}])}
  const mates=new Set(me&&me.mates||[]);
  for(const e of CL.ents.values()){if(!inV(e.x,e.y,40))continue;
-  L.push([e.y,()=>{const[a,b]=S(e.x,e.y);let ring=null;if(e===myE)ring='#ffd84a';else if(mates.has(e.id))ring=me.team?'#4f8cff':'#ff5050';else if(CL.known.has(e.id))ring='#ff3030';
+  L.push([e.y,()=>{const[a,b]=S(e.x,e.y);let ring=null;if(e===myE)ring='#ffd84a';else if(mates.has(e.id))ring=me.team?'#4f8cff':'#ff5050';
    if(ring){c.strokeStyle=ring;c.lineWidth=2.5;c.beginPath();c.ellipse(a,b,13,5.5,0,0,7);c.stroke()}
    drawChar(c,a,b,e.skin,e.ang,e.st,(now-e.st0)/1000,e.ph,now,1.15)}])}
  L.sort((p,q)=>p[0]-q[0]);for(const d of L)d[1]();
@@ -585,7 +585,6 @@ function draw(dt,now){
  CL.parts=CL.parts.filter(p=>(p.t+=dt)<0.5);for(const p of CL.parts){const[a,b]=S(p.x,p.y);c.fillStyle=`rgba(240,240,240,${0.7-p.t*1.4})`;for(let j=0;j<5;j++){const an=j*1.26;circ(c,a+Math.cos(an)*p.t*40,b-16+Math.sin(an)*p.t*24,6+p.t*10)}}
  c.textAlign='center';
  for(const e of CL.ents.values()){if(!inV(e.x,e.y,40))continue;const[a,b]=S(e.x,e.y);
-  if(CL.known.has(e.id)&&e!==myE){c.font='bold 22px sans-serif';c.lineWidth=4;c.strokeStyle='#000';c.strokeText('！',a,b-58);c.fillStyle='#ff4040';c.fillText('！',a,b-58)}
   if(e===myE){c.fillStyle='#ffd84a';c.beginPath();c.moveTo(a-6,b-62);c.lineTo(a+6,b-62);c.lineTo(a,b-54);c.closePath();c.fill()}}
  if(myE&&me.alive){let hint='';for(let i=0;i<o.length;i+=3){const ty=o[i];if(Math.hypot(o[i+1]-myE.x,o[i+2]-myE.y)>30)continue;if(ty===1)hint='K：拾う';else if(ty===2)hint='K：コインを拾う';else if(ty===3&&me.role==='thief')hint='K：盗む'}
   if(!hint&&me.item)hint='';if(hint){const[a,b]=S(myE.x,myE.y);c.font='bold 13px sans-serif';c.lineWidth=3;c.strokeStyle='#000';c.strokeText(hint,a,b+20);c.fillStyle='#fff';c.fillText(hint,a,b+20)}}
