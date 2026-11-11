@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>モブまぎれ</title>
+<title>モブゲーム</title>
 <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
 *{box-sizing:border-box}
@@ -42,6 +42,31 @@ input[type=range]{padding:0;width:180px}
 #stickBase{position:absolute;width:110px;height:110px;border-radius:50%;background:#ffffff18;border:2px solid #fff4;left:40px;bottom:40px;display:none}
 #stickKnob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:#fff6}
 .tbtn{position:absolute;width:76px;height:76px;border-radius:50%;background:#ffffff22;border:2px solid #fff6;color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center;font-size:14px}
+#title{background:radial-gradient(ellipse at center,rgba(10,12,22,.15),rgba(4,5,12,.72))}
+#title .panel{position:relative;background:linear-gradient(160deg,rgba(44,48,68,.86),rgba(20,22,34,.9));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:2px solid rgba(255,215,94,.4);box-shadow:0 0 0 1px #0007,0 14px 44px #000b,0 0 50px rgba(255,190,70,.18);animation:pin .6s ease-out}
+@keyframes pin{from{opacity:0;transform:translateY(24px) scale(.96)}}
+.tvBar{position:absolute;top:10px;right:12px;display:flex;align-items:center;gap:6px;font-size:12px;color:#c8cce0;font-weight:bold}
+#tVer{background:#0005;border:1px solid #fff3;border-radius:999px;padding:2px 9px}
+#bUpd{padding:4px 10px;font-size:12px;border-radius:999px}
+#bUpd.new{background:linear-gradient(90deg,#ff7a2e,#ffcf3e);color:#3a1800;animation:upd 1s ease-in-out infinite}
+@keyframes upd{50%{box-shadow:0 0 14px #ffcf3e;transform:scale(1.06)}}
+.logo{position:relative;text-align:center;font-size:60px;font-weight:900;letter-spacing:3px;margin:22px 0 2px;line-height:1.15}
+.logo span{display:inline-block;background:linear-gradient(180deg,#fffbd0 0%,#ffd75e 40%,#ff9a2e 75%,#ff6a3d 100%);-webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-stroke:2px #6a2f00;filter:drop-shadow(0 4px 0 #4a2000) drop-shadow(0 10px 16px #000b);animation:lIn .75s cubic-bezier(.3,1.7,.5,1) both,lFl 2.6s ease-in-out infinite;animation-delay:calc(var(--i)*.09s),calc(1s + var(--i)*.18s)}
+@keyframes lIn{from{opacity:0;transform:translateY(-70px) scale(.3) rotate(-20deg)}}
+@keyframes lFl{50%{transform:translateY(-6px) rotate(calc((var(--i) - 2)*1.5deg))}}
+.spk{position:absolute;font-style:normal;color:#fff3b0;text-shadow:0 0 10px #ffd75e;animation:tw 1.6s ease-in-out infinite;-webkit-text-stroke:0}
+.spk.s1{left:6%;top:4px;font-size:26px}.spk.s2{right:7%;top:-4px;font-size:30px;animation-delay:.5s}.spk.s3{right:22%;bottom:-6px;font-size:18px;animation-delay:1s}
+@keyframes tw{0%,100%{opacity:.2;transform:scale(.6) rotate(0)}50%{opacity:1;transform:scale(1.15) rotate(30deg)}}
+.tagline{text-align:center;color:#ffe9a8;font-weight:bold;letter-spacing:2px;margin:2px 0 14px;text-shadow:0 2px 6px #000;animation:pin .8s .5s ease-out both}
+#title button{transition:transform .1s,filter .1s}
+#title button:hover{transform:translateY(-2px);filter:brightness(1.1)}
+#title button:active{transform:translateY(2px)}
+#bSolo,#bHost{flex:1;min-width:150px;padding:14px;font-size:17px;border-radius:12px;background:linear-gradient(180deg,#6b98ff,#3a5fd0);box-shadow:0 4px 0 #23397f,0 8px 16px #0007}
+#bHost{background:linear-gradient(180deg,#ff9466,#e0533a);box-shadow:0 4px 0 #8a2a17,0 8px 16px #0007}
+#bJoin{background:linear-gradient(180deg,#4fd1a0,#239a6e);box-shadow:0 3px 0 #145a40}
+#bShopT{background:linear-gradient(180deg,#ffe07a,#e0a020);color:#3a2500;box-shadow:0 3px 0 #7a5200}
+#title input{background:#141722;border:1px solid #fff3;color:#fff;border-radius:8px;padding:8px 10px;font-size:15px}
+@media (max-width:520px){.logo{font-size:42px}}
 </style></head><body>
 <canvas id="cv" width="960" height="600"></canvas>
 <div id="ver"></div>
@@ -53,8 +78,9 @@ input[type=range]{padding:0;width:180px}
 </div>
 
 <div id="title" class="screen on"><div class="panel">
- <h1>モブまぎれ <small>(仮)</small></h1>
- <div class="sub2">群衆にまぎれて、正体を見抜け！</div>
+ <div class="tvBar"><span id="tVer"></span><button id="bUpd" class="sub" title="最新版に更新（再読み込み）">🔄 更新</button></div>
+ <div class="logo"><i class="spk s1">✦</i><span style="--i:0">モ</span><span style="--i:1">ブ</span><span style="--i:2">ゲ</span><span style="--i:3">ー</span><span style="--i:4">ム</span><i class="spk s2">✦</i><i class="spk s3">✧</i></div>
+ <div class="tagline">― 群衆にまぎれて、正体を見抜け！ ―</div>
  <div class="row"><label>なまえ</label><input id="inName" maxlength="8"></div>
  <div class="lbl">スキン（NPCの見た目にも使われます）</div>
  <div id="skinsT" class="skins"></div>
@@ -111,7 +137,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.12.0';
+const GAME_VERSION='0.13.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -765,7 +791,7 @@ function frame(){requestAnimationFrame(frame);const now=performance.now(),dt=Mat
   if(phase==='game'){const inp=readInput();if(isHost)inputs[myPid]=inp;else sendInput(inp);
    const me=CL.me;if(me&&!me.alive){if(!CL.spec){CL.spec=1;CL.camX=me.dx||CL.camX;CL.camY=me.dy||CL.camY}CL.camX=clamp(CL.camX+inp.mx*400*dt,0,W);CL.camY=clamp(CL.camY+inp.my*400*dt,0,H)}else if(CL)CL.spec=0}
   draw(dt,now)}
- else{const k=cv.width/VW;ctx.setTransform(k,0,0,k,0,0);ctx.fillStyle='#1e2a22';ctx.fillRect(0,0,VW,VH)}
+ else{const k=cv.width/VW;ctx.setTransform(k,0,0,k,0,0);if(typeof titleBg==='function')titleBg(dt,now)}
 }
 
 // ================= UIの配線 =================
@@ -1002,5 +1028,48 @@ addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button'
   if(show)ensure()}
  requestAnimationFrame(poll);
 })();
+</script>
+<script>
+// ================= タイトル背景（群衆がうろうろして、ときどきパンチ） =================
+const TB={w:[],parts:[],t:0,next:2};
+function tbSkins(){const a=[];SKINS.forEach((s,i)=>{if(!s.r&&!s.school&&!(PRICES[i]>0))a.push(i)});const o=myOwned.filter(i=>SKINS[i]);return a.concat(o,o)}
+function tbSpawn(w,edge){const pool=tbSkins();w.skin=pool[ri(pool.length)];if(edge){const s=ri(4);w.x=s===0?-20:s===1?VW+20:rnd()*VW;w.y=s===2?60:s===3?VH+20:60+rnd()*(VH-60)}else{w.x=rnd()*VW;w.y=70+rnd()*(VH-70)}
+ w.tx=rnd()*VW;w.ty=80+rnd()*(VH-90);w.st=1;w.st0=performance.now();w.ph=rnd()*6;w.spd=28+rnd()*30;w.wait=0;w.ang=Math.atan2(w.ty-w.y,w.tx-w.x)}
+function tbSet(w,st,now){if(w.st!==st){w.st=st;w.st0=now}}
+function titleBg(dt,now){const c=ctx;
+ if(!TB.w.length){TB.trees=[];for(let i=0;i<9;i++)TB.trees.push([rnd()*VW,90+rnd()*(VH-90)]);for(let i=0;i<30;i++){const w={};tbSpawn(w,false);TB.w.push(w)}}
+ // 地面
+ const g=c.createLinearGradient(0,0,0,VH);g.addColorStop(0,'#2f5a3a');g.addColorStop(1,'#1f3d28');c.fillStyle=g;c.fillRect(0,0,VW,VH);
+ c.fillStyle='#b9a98a';c.fillRect(0,VH*0.42,VW,90);c.fillRect(VW*0.46,0,90,VH);
+ c.fillStyle='rgba(0,0,0,.08)';for(let x=0;x<VW;x+=30)for(let y=VH*0.42;y<VH*0.42+90;y+=30)if(((x+y)/30)%2<1)c.fillRect(x,y,30,30);
+ for(let y=0;y<VH;y+=30)for(let x=VW*0.46;x<VW*0.46+90;x+=30)if(((x+y)/30)%2<1)c.fillRect(x,y,30,30);
+ // 更新
+ TB.t+=dt;if(TB.t>TB.next){TB.t=0;TB.next=1.6+rnd()*2.2;
+  const live=TB.w.filter(w=>w.st<=1);if(live.length>2){const a=live[ri(live.length)];let b=null,bd=1e9;for(const o of live){if(o===a)continue;const d=Math.hypot(o.x-a.x,o.y-a.y);if(d<bd){bd=d;b=o}}
+   if(b){a.hunt=b}}}
+ for(const w of TB.w){const el=(now-w.st0)/1000;
+  if(w.st===5){if(el>1.6){TB.parts.push({x:w.x,y:w.y,t:0});tbSpawn(w,true)}continue}
+  if(w.st===3){if(el>.4)tbSet(w,1,now);continue}
+  if(w.hunt){const b=w.hunt;if(b.st===5){w.hunt=null}else{const d=Math.hypot(b.x-w.x,b.y-w.y);w.ang=Math.atan2(b.y-w.y,b.x-w.x);
+    if(d<26){tbSet(w,3,now);w.hunt=null;setTimeout(()=>{if(b.st!==5){tbSet(b,5,performance.now());if(phase==='title')SND.play('thud',.22,.2)}},180);continue}
+    tbSet(w,2,now);w.x+=Math.cos(w.ang)*w.spd*2.2*dt;w.y+=Math.sin(w.ang)*w.spd*2.2*dt;continue}}
+  if(w.wait>0){w.wait-=dt;tbSet(w,0,now);continue}
+  const dx=w.tx-w.x,dy=w.ty-w.y,d=Math.hypot(dx,dy);
+  if(d<6){w.tx=rnd()*VW;w.ty=80+rnd()*(VH-90);w.wait=rnd()<.4?.5+rnd()*2:0;continue}
+  tbSet(w,1,now);w.ang=Math.atan2(dy,dx);w.x+=dx/d*w.spd*dt;w.y+=dy/d*w.spd*dt}
+ // 描画（奥から順に）
+ const L=[];for(const t of TB.trees)L.push([t[1],()=>drawTree(c,t[0],t[1])]);
+ for(const w of TB.w)L.push([w.y,()=>{try{drawChar(c,w.x,w.y,w.skin,w.ang,w.st,(now-w.st0)/1000,w.ph,now,1.15)}catch(e){}}]);
+ L.sort((a,b)=>a[0]-b[0]);for(const l of L)l[1]();
+ for(let i=TB.parts.length-1;i>=0;i--){const p=TB.parts[i];p.t+=dt;if(p.t>.5){TB.parts.splice(i,1);continue}c.fillStyle=`rgba(230,230,235,${.6*(1-p.t*2)})`;for(let j=0;j<6;j++){const an=j*1.05;circ(c,p.x+Math.cos(an)*p.t*50,p.y-12+Math.sin(an)*p.t*30,8*(1-p.t))}}
+ // ふち暗く
+ const v=c.createRadialGradient(VW/2,VH/2,VH*.3,VW/2,VH/2,VW*.7);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.55)');c.fillStyle=v;c.fillRect(0,0,VW,VH);
+}
+// ================= バージョン表示・更新ボタン =================
+$('tVer').textContent='ver '+GAME_VERSION;
+$('bUpd').onclick=()=>{location.replace(location.pathname+'?v='+Date.now())};
+(()=>{const vs=()=>{$('ver').style.display=phase==='title'?'none':''};const _s=showScreen;showScreen=function(id){_s(id);vs()};vs();
+ if(location.protocol.startsWith('http'))fetch(location.pathname+'?vc='+Date.now(),{cache:'no-store'}).then(r=>r.text()).then(t=>{const m=t.match(/GAME_VERSION='([^']+)'/);
+  if(m&&m[1]!==GAME_VERSION){const b=$('bUpd');b.classList.add('new');b.textContent='🆕 ver '+m[1]+' に更新'}}).catch(()=>{})})();
 </script>
 </body></html>
