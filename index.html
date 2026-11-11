@@ -111,7 +111,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.11.0';
+const GAME_VERSION='0.11.1';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -786,7 +786,8 @@ requestAnimationFrame(frame);
 <script>
 // ================= サウンド（BGM・効果音 / すべてWeb Audioで自動生成） =================
 const SND=(()=>{
- let ctx=null,master,bgmG,sfxG,noiseBuf,mode=+(lsGet('mm_snd','0'))||0; // 0=全部ON 1=BGMだけOFF 2=全部OFF
+ let ctx=null,master,bgmG,sfxG,noiseBuf,muted=lsGet('mm_mute','0')==='1';
+ const num=(k,d)=>{const v=+lsGet(k,d);return isNaN(v)?+d:Math.max(0,Math.min(100,v))};let bgmV=num('mm_bgmv','60'),sfxV=num('mm_sfxv','80');
  const last={};
  function init(){if(ctx)return;try{ctx=new (window.AudioContext||window.webkitAudioContext)()}catch(e){return}
   master=ctx.createGain();master.connect(ctx.destination);bgmG=ctx.createGain();bgmG.connect(master);sfxG=ctx.createGain();sfxG.connect(master);
@@ -794,8 +795,10 @@ const SND=(()=>{
  function unlock(){init();if(ctx&&ctx.state==='suspended'&&!document.hidden)ctx.resume();if(ctx&&cur&&!timer)startLoop()}
  addEventListener('pointerdown',unlock,true);addEventListener('keydown',unlock,true);addEventListener('touchstart',unlock,true);
  document.addEventListener('visibilitychange',()=>{if(!ctx)return;document.hidden?ctx.suspend():ctx.resume()});
- function applyMode(){if(!ctx)return;bgmG.gain.value=mode===0?0.32:0;sfxG.gain.value=mode===2?0:0.7;const b=document.getElementById('sndBtn');if(b)b.textContent=['🔊','🎵✕','🔇'][mode]}
- function toggle(){mode=(mode+1)%3;lsSet('mm_snd',mode);init();applyMode()}
+ function applyMode(){const b=document.getElementById('sndBtn');if(b)b.textContent=muted||(!bgmV&&!sfxV)?'🔇':'🔊';if(!ctx)return;bgmG.gain.value=muted?0:bgmV/100*.53;sfxG.gain.value=muted?0:sfxV/100*.875}
+ function toggle(){muted=!muted;lsSet('mm_mute',muted?'1':'0');init();applyMode();syncUI()}
+ function setVol(kind,v){v=Math.max(0,Math.min(100,+v||0));if(kind==='bgm'){bgmV=v;lsSet('mm_bgmv',v)}else{sfxV=v;lsSet('mm_sfxv',v)}if(muted&&v>0){muted=false;lsSet('mm_mute','0')}init();applyMode();syncUI()}
+ function syncUI(){const a=document.getElementById('volBgm'),b=document.getElementById('volSfx'),m=document.getElementById('volMute');if(a){a.value=bgmV;document.getElementById('volBgmN').textContent=bgmV}if(b){b.value=sfxV;document.getElementById('volSfxN').textContent=sfxV}if(m)m.textContent=muted?'🔇 ミュート中（押して解除）':'🔇 ミュート'}
  const mtof=m=>440*Math.pow(2,(m-69)/12);
  const NN={C:0,'C#':1,D:2,'D#':3,E:4,F:5,'F#':6,G:7,'G#':8,A:9,'A#':10,B:11};
  function n2m(s){const m=s.match(/^([A-G]#?)(\d)$/);return m?NN[m[1]]+12*(+m[2]+1):null}
@@ -836,7 +839,7 @@ const SND=(()=>{
   dup:(t,v)=>arp(t,['E5','C5','A4'],.12,{type:'triangle',vol:.22*v,len:.25}),
   crown:(t,v)=>{arp(t,['G5','C6','E6','G6'],.08,{type:'square',vol:.12*v,len:.5});noise(t+.35,.6,{vol:.12*v,type:'highpass',f:6000})},
  };
- function play(name,v=1,gap=.05){if(!ctx||mode===2||v<=0.02)return;const t=ctx.currentTime;if(last[name]&&t-last[name]<gap)return;last[name]=t;try{FX[name](t+.005,Math.min(1,v))}catch(e){}}
+ function play(name,v=1,gap=.05){if(!ctx||muted||!sfxV||v<=0.02)return;const t=ctx.currentTime;if(last[name]&&t-last[name]<gap)return;last[name]=t;try{FX[name](t+.005,Math.min(1,v))}catch(e){}}
  // ---- BGM（ステップシーケンサー） ----
  const Q={'':[0,4,7],m:[0,3,7],maj7:[0,4,7,11],m7:[0,3,7,10],'7':[0,4,7,10]};
  function chord(s){const m=s.match(/^([A-G]#?)(.*)$/);const r=NN[m[1]]+48;return (Q[m[2]]||Q['']).map(i=>r+i)}
@@ -876,11 +879,20 @@ const SND=(()=>{
    if(tr.s[s]==='x')noise(t,.12,{vol:.18*sv,f:1800,q:.8,out:bgmG});
    if(hp&&hp[s]==='x')noise(t,.035,{vol:.07*sv,type:'highpass',f:7000,out:bgmG});
    nextT+=sd;step++}}
- return{play,setTrack,toggle,unlock,get ctx(){return ctx},setHurry(h){hurry=h},get track(){return curName}};
+ return{play,setTrack,toggle,setVol,syncUI,get bgmV(){return bgmV},get sfxV(){return sfxV},unlock,get ctx(){return ctx},setHurry(h){hurry=h},get track(){return curName}};
 })();
-// 音量ボタン
-(()=>{const b=document.createElement('div');b.id='sndBtn';b.style.cssText='position:absolute;right:76px;top:4px;z-index:30;font-size:16px;cursor:pointer;background:#0006;border-radius:8px;padding:2px 7px;user-select:none';
- b.textContent=['🔊','🎵✕','🔇'][+(lsGet('mm_snd','0'))||0];b.title='音：全部ON → BGMだけOFF → 全部OFF（Mキーでも切替）';b.onclick=e=>{e.stopPropagation();SND.toggle()};document.body.appendChild(b)})();
+// 音の設定（右上の🔊ボタン）
+(()=>{const b=document.createElement('div');b.id='sndBtn';b.style.cssText='position:absolute;right:76px;top:4px;z-index:31;font-size:16px;cursor:pointer;background:#0006;border-radius:8px;padding:2px 7px;user-select:none';b.title='音の設定（Mキーでミュート）';
+ const pn=document.createElement('div');pn.id='sndPanel';pn.style.cssText='position:absolute;right:10px;top:34px;z-index:31;background:#262a35;border:1px solid #fff3;border-radius:12px;padding:12px 14px;width:230px;display:none;box-shadow:0 6px 20px #0009;font-size:14px';
+ const row=(id,lb)=>`<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;color:#ccc"><span>${lb}</span><span id="${id}N"></span></div><input id="${id}" type="range" min="0" max="100" step="5" style="width:100%"></div>`;
+ pn.innerHTML='<b style="color:#ffd75e">🔊 音の設定</b>'+row('volBgm','🎵 BGM')+row('volSfx','💥 効果音')+'<button id="volMute" data-nosnd="1" style="width:100%;padding:6px;font-size:13px;margin-top:4px;background:#555"></button><button id="volClose" style="width:100%;padding:6px;font-size:13px;margin-top:6px">閉じる</button>';
+ document.body.appendChild(b);document.body.appendChild(pn);
+ ['pointerdown','touchstart','mousedown','keydown'].forEach(ev=>pn.addEventListener(ev,e=>e.stopPropagation()));
+ b.onclick=e=>{e.stopPropagation();SND.unlock();pn.style.display=pn.style.display==='none'?'block':'none';SND.syncUI()};
+ $('volBgm').oninput=e=>SND.setVol('bgm',e.target.value);
+ $('volSfx').oninput=e=>SND.setVol('sfx',e.target.value);$('volSfx').onchange=()=>SND.play('coin');
+ $('volMute').onclick=()=>SND.toggle();$('volClose').onclick=()=>{pn.style.display='none'};
+ SND.syncUI();b.textContent=lsGet('mm_mute','0')==='1'?'🔇':'🔊'})();
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key==='m'||e.key==='M')SND.toggle()});
 // ボタンのクリック音
 addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b&&!b.disabled&&!b.dataset.nosnd)SND.play('click',1,.03)},true);
