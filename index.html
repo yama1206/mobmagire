@@ -93,7 +93,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.2.0';
+const GAME_VERSION='0.3.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -346,7 +346,7 @@ function hostTick(){
 function controlEnt(p,e,inp,dt){
  const pN=inp.p|0,aN=inp.a|0,pp=pN!==p.lastP,ap=aN!==p.lastA;p.lastP=pN;p.lastA=aN;
  if(e.st===ST.STAG||e.st===ST.DOWN||e.st===ST.PUNCH)return;
- if(pp&&p.cd<=0){setSt(e,ST.PUNCH,PUNCH_T);e.hit=false;e.pv=PUNCH_T;p.cd=PUNCH_CD;return}
+ if(pp&&p.cd<=0){setSt(e,ST.PUNCH,PUNCH_T);e.hit=false;e.pv=PUNCH_T;e.seenBy=new Set();p.punches=(p.punches||0)+1;p.cd=PUNCH_CD;return}
  if(ap)doAction(p,e);
  let mx=+inp.mx||0,my=+inp.my||0;const l=Math.hypot(mx,my);
  if(l>0.2){mx/=l;my/=l;const sp=(inp.run?RUN:WALK)*Math.min(1,l);e.ang=Math.atan2(my,mx);moveEnt(e,mx*sp*dt,my*sp*dt);e.st=inp.run?ST.RUN:ST.WALK}else e.st=ST.IDLE;
@@ -388,9 +388,9 @@ function eliminate(vp,ve,ap){
  toastAll(`${vp.name} がやられた！`);toastP(vp,rs!=null?`パンチされた！ ${rs}秒後に別の場所で復活`:'パンチされた… 脱落（観戦中はカメラを動かせます）');
 }
 function witness(){
- for(const a of G.ents){if(!(a.pv>0)||!a.pid)continue;
-  for(const p of G.plist){if(!p.alive||p.pid===a.pid||p.known.has(a.id))continue;const v=G.em.get(p.eid);if(!v)continue;
-   if(canSee(v,a))p.known.add(a.id)}}
+ for(const a of G.ents){if(!(a.pv>0)||!a.pid||!a.seenBy)continue;
+  for(const p of G.plist){if(!p.alive||p.pid===a.pid||a.seenBy.has(p.pid))continue;const v=G.em.get(p.eid);if(!v)continue;
+   if(canSee(v,a)){a.seenBy.add(p.pid);p.seen=(p.seen||0)+1;p.known.add(a.id)}}}
 }
 function stuckCheck(){
  for(const e of G.ents){
@@ -444,7 +444,9 @@ function sendSnaps(){
   sendTo(p.pid,{t:'s',e:G.snapE,o:G.snapO,tm:Math.max(0,Math.ceil(G.time)),me:{id:p.alive?p.eid:0,alive:p.alive,item:p.item,cd:+p.cd.toFixed(1),stun:e&&e.st===ST.STAG?+(e.dur-e.stT).toFixed(1):0,role:p.role,team:p.team,mates,info:G.md.info(G,p),resp:p.respawnT>0?Math.ceil(p.respawnT):0,dx:p.deadX|0,dy:p.deadY|0}});
  }
 }
-function endGame(res){G.over=true;clearInterval(G.iv);for(const p of G.plist)if(!p.cpu&&!p.left)sendTo(p.pid,{t:'end',title:res.title,lines:res.lines})}
+function endGame(res){G.over=true;clearInterval(G.iv);
+ const tot=G.plist.reduce((a,p)=>a+(p.punches||0),0);
+ res.lines=[...(res.lines||[]),'<br><b>👀 画面に映ったパンチ</b>',...G.plist.map(p=>{const all=tot-(p.punches||0),sn=p.seen||0;return`${p.name}${p.cpu?'(CPU)':''}　${sn}回 / 全体 ${all}回（見逃し ${all-sn}回）`})];for(const p of G.plist)if(!p.cpu&&!p.left)sendTo(p.pid,{t:'end',title:res.title,lines:res.lines})}
 function hostToLobby(){if(G&&G.iv)clearInterval(G.iv);G=null;bcast({t:'tolobby'});lobbyBroadcast()}
 
 // ================= クライアント =================
