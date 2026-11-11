@@ -137,7 +137,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.15.3';
+const GAME_VERSION='0.16.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -548,7 +548,7 @@ function npcHit(n,a){const s=G.set;
  else{setSt(n,ST.IDLE);n.m=0;n.aiT=2}}
 function eliminate(vp,ve,ap){
  setSt(ve,ST.DOWN,1.5);ve.rm=true;vp.alive=false;vp.deadX=ve.x;vp.deadY=ve.y;
- if(ap)ap.kills++;G.md.onKill&&G.md.onKill(G,ap,vp,ve);
+ if(ap){ap.kills++;if(!G.fb){G.fb=ap;toastAll(`🩸 ファーストキル！ ${ap.name}（王冠2個）`)}}G.md.onKill&&G.md.onKill(G,ap,vp,ve);
  const rs=G.set.respawn;vp.respawnT=rs!=null?rs:-1;
  toastAll(`${vp.name} がやられた！`);toastP(vp,rs!=null?`パンチされた！ ${rs}秒後に別の場所で復活`:'パンチされた… 脱落（観戦中はカメラを動かせます）');
 }
@@ -572,7 +572,7 @@ function npcThink(e,dt){
  e.aiT-=dt;
  if(e.aiT<=0){const r=rnd()*(A.walk+A.idle+A.run);if(r<A.walk){e.m=1;e.aiT=rr(...A.walkTime)}else if(r<A.walk+A.idle){e.m=0;e.aiT=rr(...A.idleTime)}else{e.m=2;e.aiT=rr(...A.runTime)}if(e.m){const p=randPt(e,450);e.tx=p.x;e.ty=p.y}}
  if(e.m&&rnd()<A.turn*dt){const p=randPt(e,450);e.tx=p.x;e.ty=p.y}
- if(rnd()<A.stag*dt){setSt(e,ST.STAG,rr(...A.stagTime));return}
+
  if(e.m){const dx=e.tx-e.x,dy=e.ty-e.y,d=Math.hypot(dx,dy);if(d<12){e.m=0;e.aiT=rr(...A.idleTime);e.st=ST.IDLE;return}
   const sp=e.m===2?RUN:WALK;e.ang=Math.atan2(dy,dx);moveEnt(e,dx/d*sp*dt,dy/d*sp*dt);e.st=e.m===2?ST.RUN:ST.WALK}else e.st=ST.IDLE;
 }
@@ -611,7 +611,7 @@ function sendSnaps(){
 }
 function endGame(res){G.over=true;clearInterval(G.iv);
  const tot=G.plist.reduce((a,p)=>a+(p.punches||0),0);
- res.lines=[...(res.lines||[]),'<br><b>👀 画面に映ったパンチ</b>',...G.plist.map(p=>{const all=tot-(p.punches||0),sn=p.seen||0;return`${p.name}${p.cpu?'(CPU)':''}　${sn}回 / 全体 ${all}回（見逃し ${all-sn}回）`})];for(const p of G.plist)if(!p.cpu&&!p.left)sendTo(p.pid,{t:'end',title:res.title,lines:res.lines,crown:(res.w||[]).includes(p.pid)})}
+ res.lines=[...(res.lines||[]),'<br><b>👀 画面に映ったパンチ</b>',...G.plist.map(p=>{const all=tot-(p.punches||0),sn=p.seen||0;return`${p.name}${p.cpu?'(CPU)':''}　${sn}回 / 全体 ${all}回（見逃し ${all-sn}回）`})];for(const p of G.plist)if(!p.cpu&&!p.left)sendTo(p.pid,{t:'end',title:res.title,lines:res.lines,crown:(res.w||[]).includes(p.pid),fb:G.fb===p})}
 function hostToLobby(){if(G&&G.iv)clearInterval(G.iv);G=null;bcast({t:'tolobby'});lobbyBroadcast()}
 
 // ================= クライアント =================
@@ -638,7 +638,8 @@ function updateHud(){
  if(top!==CL.hudT){$('hudTop').innerHTML=top;CL.hudT=top}if(bot!==CL.hudB){$('hudBot').innerHTML=bot;CL.hudB=bot}
 }
 function toast(s){const t=$('toasts');while(t.children.length>3)t.firstChild.remove();const d=document.createElement('div');d.className='toast';d.textContent=s;t.appendChild(d);t.appendChild(document.createElement('br'));setTimeout(()=>{d.remove()},3000);setTimeout(()=>{if(t.lastChild&&t.lastChild.tagName==='BR'&&t.children.length&&t.firstChild.tagName==='BR')t.firstChild.remove()},3100)}
-function showResult(m){phase='result';showScreen('result');$('rsTitle').textContent=m.title;let cw='';if(m.crown){myCrowns++;saveWallet();cw=`<div style="font-size:20px;color:#ffd75e;margin:6px 0"><b>👑 王冠を1個手に入れた！（所持 ${myCrowns}個）</b></div>`}
+function showResult(m){phase='result';showScreen('result');$('rsTitle').textContent=m.title;let cw='';if(m.crown){myCrowns++;saveWallet();cw=`<div style="font-size:20px;color:#ffd75e;margin:6px 0"><b>👑 勝利！王冠を1個手に入れた！（所持 ${myCrowns}個）</b></div>`}
+ if(m.fb){myCrowns+=2;saveWallet();cw+=`<div style="font-size:18px;color:#ff9f9f;margin:6px 0"><b>🩸 ファーストキル！王冠を2個手に入れた！（所持 ${myCrowns}個）</b></div>`}
  $('rsLines').innerHTML=cw+(m.lines||[]).join('<br>');
  window.menuLockUntil=performance.now()+1500;$('rsWait').textContent=isHost?'':'次の試合はホストが始めます。ロビーで待っていてください';$('touch').style.display='none'}
 
