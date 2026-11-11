@@ -655,6 +655,8 @@ function readPads(){const gps=navigator.getGamepads?navigator.getGamepads():[];c
     if(near(-1)||near(-0.714)||near(1))B[12]=true;if(near(-0.714)||near(-0.429)||near(-0.143))B[15]=true;if(near(-0.143)||near(0.143)||near(0.429))B[13]=true;if(near(0.429)||near(0.714)||near(1))B[14]=true}
    if(!sony&&g.axes.length>=6&&g.axes.length<10){const hx=g.axes[g.axes.length-2],hy=g.axes[g.axes.length-1];if(Math.abs(hx)===1||Math.abs(hy)===1){if(hy<-.5)B[12]=true;if(hy>.5)B[13]=true;if(hx<-.5)B[14]=true;if(hx>.5)B[15]=true}}}}
  return{any,ax,ay,b:i=>B[i]}}
+addEventListener('gamepadconnected',e=>{const g=e.gamepad;try{setStatus(`🎮 コントローラーを認識しました（${g.mapping==='standard'?'標準配置':'変換して使用'}）：${(g.id||'').slice(0,40)}`)}catch(x){}});
+addEventListener('gamepaddisconnected',()=>{try{setStatus('🎮 コントローラーが外れました')}catch(x){}});
 // ================= 入力 =================
 const KEY={};let pN=0,aN=0,gpPrev=[false,false],lastSend=0,lastInp='';
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT')return;const k=e.key.toLowerCase();
