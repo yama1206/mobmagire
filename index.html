@@ -138,12 +138,12 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.18.0';
+const GAME_VERSION='0.19.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
 const ST={IDLE:0,WALK:1,RUN:2,PUNCH:3,STAG:4,DOWN:5};
-const ITEMS=['','変装セット','煙玉','探知レーダー'];const DET_T=6;
+const ITEMS=['','変装セット','どろん玉','探知レーダー'];const DORON_CD=8;const DET_T=6;
 const PEER_PREFIX='mobmagire-v1-';
 const CPU_NAMES=['ロボ太','ロボ子','メカ吉','ギア美','ボルト','ナット','チップ'];
 // NPC行動の初期設定（モードごとに上書き可）
@@ -536,7 +536,10 @@ function useItem(p,e){
  if(it===1){const pool=G.skinUniq.length>1?G.skinUniq.filter(s=>s!==e.skin):SKINS.map((s,i)=>i).filter(i=>i!==e.skin);e.skin=pick(pool);p.curSkin=e.skin;
   for(const q of G.plist){if(q===p||!q.known.has(e.id))continue;const v=q.alive&&G.em.get(q.eid);if(!v||!canSee(v,e)){q.known.delete(e.id)}}
   toastP(p,`変装した！（${SKINS[e.skin].n}）`)}
- else if(it===2){G.objs.smokes.push({x:e.x,y:e.y,r:110,t:7});toastP(p,'煙玉を使った！')}
+ else if(it===2){// どろん玉：消えて別の場所に出現。出現後しばらくパンチできない
+  const s=spawnPoint(true);G.ents.splice(G.ents.indexOf(e),1);G.em.delete(e.id);
+  const n=addEnt(s.x,s.y,e.skin,p.pid);n.ang=e.ang;p.eid=n.id;for(const q of G.plist)q.known.delete(e.id);
+  p.cd=Math.max(p.cd,DORON_CD);toastP(p,`どろん！別の場所に移動した（${DORON_CD}秒間パンチできない）`)}
  else if(it===3){// 探知：敵プレイヤー1人＋その近くのNPC2体を赤枠で表示（どれが本物かは分からない）
   let tg=null,bd=1e9;for(const q of G.plist){if(q===p||!q.alive||q.left||!G.md.isEnemy(G,p,q))continue;const t=G.em.get(q.eid);if(!t)continue;const d=dist(e,t);if(d<bd){bd=d;tg=t}}
   const c=tg||e,np=G.ents.filter(n=>!n.pid&&n.st!==ST.DOWN).sort((a,b)=>dist(a,c)-dist(b,c));
@@ -1046,7 +1049,7 @@ addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button'
  const _tt=toTitle;toTitle=function(){_tt();lastMem=-1};
  const _toast=toast;toast=function(s){_toast(s);s=String(s);
   if(/パンチされた/.test(s))SND.play('hurt');else if(/がやられた/.test(s))SND.play('elim',.8);else if(/手に入れた/.test(s))SND.play('pickup');
-  else if(/変装/.test(s))SND.play('disguise');else if(/煙玉/.test(s)){}else if(/だった…/.test(s))SND.play('oops');else SND.play('toast',1,.2)};
+  else if(/変装/.test(s))SND.play('disguise');else if(/どろん！/.test(s))SND.play('disguise');else if(/だった…/.test(s))SND.play('oops');else SND.play('toast',1,.2)};
  // 試合中：スナップショットの変化から音を出す（自分の画面の近くの出来事ほど大きく）
  let prevSt=new Map(),prevO=null,prevTm=-1,prevAlive=true;
  const vol=(x,y)=>{if(!CL)return 0;const d=Math.hypot(x-CL.camX,y-CL.camY);return Math.max(0,1-d/560)};
