@@ -45,6 +45,7 @@ input[type=range]{padding:0;width:180px}
 #title{background:radial-gradient(ellipse at center,rgba(10,12,22,.15),rgba(4,5,12,.72))}
 #title .panel{position:relative;background:linear-gradient(160deg,rgba(44,48,68,.86),rgba(20,22,34,.9));backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:2px solid rgba(255,215,94,.4);box-shadow:0 0 0 1px #0007,0 14px 44px #000b,0 0 50px rgba(255,190,70,.18);animation:pin .6s ease-out}
 @keyframes pin{from{opacity:0;transform:translateY(24px) scale(.96)}}
+#bGift.gift{background:linear-gradient(90deg,#ff7aa8,#ffb84a);animation:giftG 1.2s ease-in-out infinite}@keyframes giftG{50%{box-shadow:0 0 14px #ffb84a}}
 .tvBar{position:absolute;top:10px;right:12px;display:flex;align-items:center;gap:6px;font-size:12px;color:#c8cce0;font-weight:bold}
 #tVer{background:#0005;border:1px solid #fff3;border-radius:999px;padding:2px 9px}
 #bUpd{padding:4px 10px;font-size:12px;border-radius:999px}
@@ -84,7 +85,7 @@ input[type=range]{padding:0;width:180px}
  <div class="row"><label>なまえ</label><input id="inName" maxlength="8"></div>
  <div class="lbl">スキン（NPCの見た目にも使われます）</div>
  <div id="skinsT" class="skins"></div>
- <div class="row"><b id="crT" style="color:#ffd75e"></b><button id="bShopT" class="sub">ショップ</button><button id="bSetT" class="sub">⚙️ 設定</button></div>
+ <div class="row"><b id="crT" style="color:#ffd75e"></b><button id="bShopT" class="sub">ショップ</button><button id="bSetT" class="sub">⚙️ 設定</button><button id="bGift" class="sub">🎁 プレゼント</button></div>
  <div class="row"><button id="bSolo">ひとりで遊ぶ（CPU）</button><button id="bHost">部屋を作る</button></div>
  <div class="row"><input id="inCode" placeholder="部屋コード（数字5けた）" maxlength="5" inputmode="numeric" pattern="[0-9]*" style="width:130px"><button id="bJoin">部屋に入る</button></div>
  <div id="status" class="status"></div>
@@ -137,7 +138,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.17.0';
+const GAME_VERSION='0.17.1';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -1161,6 +1162,10 @@ function titleBg(dt,now){const c=ctx;
  // ふち暗く
  const v=c.createRadialGradient(VW/2,VH/2,VH*.3,VW/2,VH/2,VW*.7);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.55)');c.fillStyle=v;c.fillRect(0,0,VW,VH);
 }
+// ================= プレゼント（王冠8個・1回だけ） =================
+(()=>{const b=$('bGift'),done=()=>{b.textContent='🎁 受け取り済み';b.disabled=true;b.classList.remove('gift')};
+ if(lsGet('mm_gift1','0')==='1')done();else b.classList.add('gift');
+ b.onclick=()=>{if(lsGet('mm_gift1','0')==='1'){done();return}myCrowns+=8;saveWallet();lsSet('mm_gift1','1');try{SND.play('coin')}catch(e){}setStatus(`🎁 プレゼント！王冠を8個受け取りました（所持 ${myCrowns}個）`);done()}})();
 // ================= バージョン表示・更新ボタン =================
 $('tVer').textContent='ver '+GAME_VERSION;
 $('bUpd').onclick=()=>{location.replace(location.pathname+'?v='+Date.now())};
