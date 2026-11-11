@@ -84,7 +84,7 @@ input[type=range]{padding:0;width:180px}
  <div class="row"><label>なまえ</label><input id="inName" maxlength="8"></div>
  <div class="lbl">スキン（NPCの見た目にも使われます）</div>
  <div id="skinsT" class="skins"></div>
- <div class="row"><b id="crT" style="color:#ffd75e"></b><button id="bShopT" class="sub">ショップ</button></div>
+ <div class="row"><b id="crT" style="color:#ffd75e"></b><button id="bShopT" class="sub">ショップ</button><button id="bSetT" class="sub">⚙️ 設定</button></div>
  <div class="row"><button id="bSolo">ひとりで遊ぶ（CPU）</button><button id="bHost">部屋を作る</button></div>
  <div class="row"><input id="inCode" placeholder="部屋コード" maxlength="5" style="width:130px;text-transform:uppercase"><button id="bJoin">部屋に入る</button></div>
  <div id="status" class="status"></div>
@@ -137,7 +137,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.13.0';
+const GAME_VERSION='0.14.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -911,14 +911,15 @@ const SND=(()=>{
 (()=>{const b=document.createElement('div');b.id='sndBtn';b.style.cssText='position:absolute;right:76px;top:4px;z-index:31;font-size:16px;cursor:pointer;background:#0006;border-radius:8px;padding:2px 7px;user-select:none';b.title='音の設定（Mキーでミュート）';
  const pn=document.createElement('div');pn.id='sndPanel';pn.style.cssText='position:absolute;right:10px;top:34px;z-index:31;background:#262a35;border:1px solid #fff3;border-radius:12px;padding:12px 14px;width:230px;display:none;box-shadow:0 6px 20px #0009;font-size:14px';
  const row=(id,lb)=>`<div style="margin:6px 0"><div style="display:flex;justify-content:space-between;color:#ccc"><span>${lb}</span><span id="${id}N"></span></div><input id="${id}" type="range" min="0" max="100" step="5" style="width:100%"></div>`;
- pn.innerHTML='<b style="color:#ffd75e">🔊 音の設定</b>'+row('volBgm','🎵 BGM')+row('volSfx','💥 効果音')+'<button id="volMute" data-nosnd="1" style="width:100%;padding:6px;font-size:13px;margin-top:4px;background:#555"></button><button id="volClose" style="width:100%;padding:6px;font-size:13px;margin-top:6px">閉じる</button>';
+ pn.innerHTML='<b style="color:#ffd75e">⚙️ 設定</b><div style="color:#aaa;font-size:12px;margin-top:4px">🔊 音</div>'+row('volBgm','🎵 BGM')+row('volSfx','💥 効果音')+'<button id="volMute" data-nosnd="1" style="width:100%;padding:6px;font-size:13px;margin-top:4px;background:#555"></button><button id="volClose" style="width:100%;padding:6px;font-size:13px;margin-top:6px">閉じる</button>';
  document.body.appendChild(b);document.body.appendChild(pn);
  ['pointerdown','touchstart','mousedown','keydown'].forEach(ev=>pn.addEventListener(ev,e=>e.stopPropagation()));
  b.onclick=e=>{e.stopPropagation();SND.unlock();pn.style.display=pn.style.display==='none'?'block':'none';SND.syncUI()};
  $('volBgm').oninput=e=>SND.setVol('bgm',e.target.value);
  $('volSfx').oninput=e=>SND.setVol('sfx',e.target.value);$('volSfx').onchange=()=>SND.play('coin');
  $('volMute').onclick=()=>SND.toggle();$('volClose').onclick=()=>{pn.style.display='none'};
- SND.syncUI();b.textContent=lsGet('mm_mute','0')==='1'?'🔇':'🔊'})();
+ SND.syncUI();b.textContent=lsGet('mm_mute','0')==='1'?'🔇':'🔊';
+ $('bSetT').onclick=e=>{e.stopPropagation();SND.unlock();pn.style.display='block';SND.syncUI()}})();
 addEventListener('keydown',e=>{if(e.target.tagName==='INPUT')return;if(e.key==='m'||e.key==='M')SND.toggle()});
 // ボタンのクリック音
 addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b&&!b.disabled&&!b.dataset.nosnd)SND.play('click',1,.03)},true);
