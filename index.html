@@ -86,7 +86,7 @@ input[type=range]{padding:0;width:180px}
  <div id="skinsT" class="skins"></div>
  <div class="row"><b id="crT" style="color:#ffd75e"></b><button id="bShopT" class="sub">ショップ</button><button id="bSetT" class="sub">⚙️ 設定</button></div>
  <div class="row"><button id="bSolo">ひとりで遊ぶ（CPU）</button><button id="bHost">部屋を作る</button></div>
- <div class="row"><input id="inCode" placeholder="部屋コード" maxlength="5" style="width:130px;text-transform:uppercase"><button id="bJoin">部屋に入る</button></div>
+ <div class="row"><input id="inCode" placeholder="部屋コード（数字5けた）" maxlength="5" inputmode="numeric" pattern="[0-9]*" style="width:130px"><button id="bJoin">部屋に入る</button></div>
  <div id="status" class="status"></div>
  <div class="help">
   キーボード：移動 WASD/矢印　走る Shift　パンチ J/スペース　調べる・アイテム K/E<br>
@@ -137,7 +137,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.15.2';
+const GAME_VERSION='0.15.3';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -350,7 +350,7 @@ function setStatus(s){$('status').textContent=s}
 function showScreen(id){for(const s of ['title','lobby','result','shop'])$(s).classList.toggle('on',s===id);
  $('hud').style.display=(phase==='game'||phase==='result')?'block':'none';
  $('touch').style.display=(phase==='game'&&matchMedia('(pointer:coarse)').matches)?'block':'none'}
-function genCode(){const c='ABCDEFGHJKMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<5;i++)s+=c[ri(c.length)];return s}
+function genCode(){const c='0123456789';let s='';for(let i=0;i<5;i++)s+=c[ri(c.length)];return s}
 function cleanName(s){return String(s||'').slice(0,8)||'ななし'}
 
 function soloStart(){isHost=true;myPid='h';LB.solo=true;LB.code='';LB.members=[{pid:'h',name:myName,skin:mySkin,host:1}];LB.cpu=3;applyModeDef();showLobby()}
@@ -363,7 +363,7 @@ function hostRoom(){
  peer.on('error',err=>{if(err.type==='unavailable-id'){peer.destroy();hostRoom()}else setStatus('通信エラー：'+err.type)});
 }
 function joinRoom(){
- const code=$('inCode').value.trim().toUpperCase();if(!code){setStatus('部屋コードを入れてください');return}
+ const code=$('inCode').value.replace(/[^0-9０-９]/g,'').replace(/[０-９]/g,d=>String.fromCharCode(d.charCodeAt(0)-65248));if(!code){setStatus('部屋コードを入れてください');return}
  if(typeof Peer==='undefined'){setStatus('通信ライブラリを読み込めませんでした');return}
  isHost=false;setStatus('接続中…');peer=new Peer();
  peer.on('open',()=>{hostConn=peer.connect(PEER_PREFIX+code,{reliable:true});
