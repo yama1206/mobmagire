@@ -89,7 +89,12 @@ input[type=range]{padding:0;width:180px}
 <div id="shop" class="screen"><div class="panel">
  <h2>ショップ　<span id="shopCr"></span></h2>
  <div class="desc">試合に勝つと王冠が1個もらえます。王冠でスキンを解放できます。</div>
- <div id="shopList" class="skins"></div>
+ <div class="lbl">スキン</div><div id="shopList" class="skins"></div>
+ <h2 style="margin-top:14px">動物ガチャ</h2>
+ <div class="desc">1回 👑4。日本で出会いやすい順にレア度が分かれています。<br><span style="color:#d8d8d8">★ よく会う 60%</span>／<span style="color:#7fd0ff">★★ たまに会う 30%</span>／<span style="color:#ffd75e">★★★ めったに会えない 10%</span><br>被ったときは半分（👑2）が戻ります。</div>
+ <div class="row"><button id="bGacha">ガチャを引く（👑4）</button></div>
+ <div id="gachaRes" class="desc" style="display:flex;align-items:center;gap:10px"></div>
+ <div class="lbl">動物図鑑 <span id="zukanN"></span></div><div id="zukan" class="skins"></div>
  <div class="row"><button id="bShopBack" class="sub">もどる</button></div>
 </div></div>
 
@@ -101,7 +106,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.4.0';
+const GAME_VERSION='0.5.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -123,8 +128,21 @@ const SKINS=[
  {n:'作業着',hair:'#3a2a1a',shirt:'#ef8a2a',pants:'#d07420',hat:'#ffffff',tone:'#d9a77c'},
  {n:'水色ワンピ',hair:'#5a3a20',shirt:'#7cc8e8',dress:1,tone:'#f2c9a0'},
  {n:'茶色コート',hair:'#bb8844',shirt:'#8a5a30',pants:'#2a2a2a',hat:'#5a3a20',tone:'#f0c49a'},
- {n:'ボーダー',hair:'#222',shirt:'#ffffff',stripe:'#2a3a8a',pants:'#5a6a8a',tone:'#e8b98e'}
+ {n:'ボーダー',hair:'#222',shirt:'#ffffff',stripe:'#2a3a8a',pants:'#5a6a8a',tone:'#e8b98e'},
+ // ---- 動物ガチャ（r：1=よく会う 2=たまに会う 3=めったに会えない） ----
+ {n:'柴犬',a:1,r:1,body:'#d98a3e',belly:'#f6ead8',leg:'#d98a3e',snoutCol:'#f6ead8',ear:'point',tail:'curl',atk:'bite'},
+ {n:'三毛猫',a:1,r:1,body:'#f4f0e8',belly:'#ffffff',leg:'#f4f0e8',ear:'point',tail:'long',tailc:'#e08a3c',atk:'swipe',calico:1,sn:2.5},
+ {n:'ハト',a:1,r:1,bird:1,size:1.25,body:'#8c90a0',wing:'#6e7282',head:'#7a7e90',beak:'#3a3a40',legc:'#d8606a',sheen:1,atk:'peck'},
+ {n:'カラス',a:1,r:1,bird:1,size:1.3,body:'#1d1d24',wing:'#2c2c38',head:'#1d1d24',beak:'#111',legc:'#222',atk:'wing',bigBeak:1},
+ {n:'タヌキ',a:1,r:2,body:'#8a7258',belly:'#a89070',leg:'#3a2e26',ear:'round',tail:'bush',tailc:'#6a5642',mask:1,atk:'slam',sn:3},
+ {n:'キツネ',a:1,r:2,body:'#e07a2e',belly:'#fff3e6',leg:'#3a2a22',ear:'big',tail:'bush',tailtip:'#ffffff',atk:'pounce',sn:5,snoutCol:'#fff3e6'},
+ {n:'ニホンジカ',a:1,r:2,body:'#a8703f',belly:'#e8d8c0',leg:'#a8703f',ear:'point',tail:'short',tailc:'#ffffff',spots:1,antler:1,atk:'head',legH:14},
+ {n:'ノウサギ',a:1,r:2,body:'#b08a62',belly:'#efe2cf',leg:'#b08a62',ear:'long',tail:'short',tailc:'#ffffff',hop:1,atk:'box',sn:2,legH:6},
+ {n:'ツキノワグマ',a:1,r:3,size:1.2,body:'#1a1a1e',belly:'#26262c',leg:'#1a1a1e',ear:'round',tail:'none',crescent:1,atk:'rear',snoutCol:'#6a5a4a',sn:3.5},
+ {n:'イノシシ',a:1,r:3,size:1.1,body:'#5e4a3a',belly:'#6e5a48',leg:'#3e3026',ear:'point',tail:'short',tusk:1,atk:'head',sn:5,snoutCol:'#7a6050'},
+ {n:'ニホンカモシカ',a:1,r:3,body:'#9a9690',belly:'#c8c4bc',leg:'#5a5650',ear:'point',tail:'short',horn:1,throat:1,atk:'head',legH:13}
 ];
+const RAR=['','★ よく会う','★★ たまに会う','★★★ めったに会えない'],RCOL=['','#d8d8d8','#7fd0ff','#ffd75e'];
 // スキンの解放に必要な王冠（0は最初から使える）
 const PRICES=[0,0,0,0,0,0,1,1,2,2,3,3];
 const $=id=>document.getElementById(id);
@@ -285,19 +303,29 @@ function onMsg(m){
 function toTitle(){if(G&&G.iv)clearInterval(G.iv);G=null;CL=null;if(peer){try{peer.destroy()}catch(e){}}peer=null;hostConn=null;conns={};phase='title';showScreen('title')}
 
 // ---- ロビーUI ----
-function buildSkinGrid(el,onPick){el.innerHTML='';SKINS.forEach((s,i)=>{const own=isOwned(i);const d=document.createElement('div');d.className='skin'+(i===mySkin?' sel':'');if(!own)d.style.opacity='.45';
+function buildSkinGrid(el,onPick){el.innerHTML='';SKINS.forEach((s,i)=>{const own=isOwned(i);if(s.r&&!own)return;const d=document.createElement('div');d.dataset.i=i;d.className='skin'+(i===mySkin?' sel':'');if(!own)d.style.opacity='.45';
  const cv2=document.createElement('canvas');cv2.width=54;cv2.height=58;const c2=cv2.getContext('2d');drawChar(c2,27,54,i,Math.PI/2,0,0,0,0,1.25);
  d.appendChild(cv2);d.appendChild(document.createTextNode(own?s.n:'🔒👑'+PRICES[i]));
- d.onclick=()=>{if(!own){openShop();return}mySkin=i;lsSet('mm_skin',i);[...el.children].forEach((c,j)=>c.classList.toggle('sel',j===i));onPick&&onPick(i)};el.appendChild(d)})}
+ d.onclick=()=>{if(!own){openShop();return}mySkin=i;lsSet('mm_skin',i);[...el.children].forEach(c=>c.classList.toggle('sel',+c.dataset.i===i));onPick&&onPick(i)};el.appendChild(d)})}
 function openShop(){shopOpen=true;showScreen('shop');renderShop()}
 function closeShop(){shopOpen=false;if(phase==='lobby')showLobby();else{showScreen('title');buildSkinGrid($('skinsT'))}}
 function renderShop(){updCrowns();const el=$('shopList');el.innerHTML='';
- SKINS.forEach((s,i)=>{if(PRICES[i]===0)return;const own=isOwned(i);const d=document.createElement('div');d.className='skin';d.style.width='84px';
+ SKINS.forEach((s,i)=>{if(!PRICES[i])return;const own=isOwned(i);const d=document.createElement('div');d.className='skin';d.style.width='84px';
   const cv2=document.createElement('canvas');cv2.width=54;cv2.height=58;drawChar(cv2.getContext('2d'),27,54,i,Math.PI/2,0,0,0,0,1.25);d.appendChild(cv2);
   d.appendChild(document.createTextNode(s.n));const bt=document.createElement('button');bt.style.cssText='padding:4px 8px;font-size:12px;margin-top:3px';
   if(own){bt.textContent='解放済み';bt.disabled=true}else{bt.textContent='👑'+PRICES[i]+' で解放';bt.disabled=myCrowns<PRICES[i];
    bt.onclick=()=>{if(myCrowns<PRICES[i])return;if(!confirm(`王冠${PRICES[i]}個で「${s.n}」を解放しますか？`))return;myCrowns-=PRICES[i];myOwned.push(i);saveWallet();renderShop()}}
-  d.appendChild(document.createElement('br'));d.appendChild(bt);el.appendChild(d)})}
+  d.appendChild(document.createElement('br'));d.appendChild(bt);el.appendChild(d)});
+ $('bGacha').disabled=myCrowns<GACHA_COST;const z=$('zukan');z.innerHTML='';let got=0,all=0;
+ SKINS.forEach((s,i)=>{if(!s.r)return;all++;const own=myOwned.includes(i);if(own)got++;const d=document.createElement('div');d.className='skin';d.style.width='84px';
+  const cv2=document.createElement('canvas');cv2.width=54;cv2.height=58;if(own)drawChar(cv2.getContext('2d'),27,52,i,0,0,0,0,0,1.25);else{const c2=cv2.getContext('2d');c2.fillStyle='#555';c2.font='bold 30px sans-serif';c2.textAlign='center';c2.fillText('？',27,40)}
+  d.appendChild(cv2);const tx=document.createElement('div');tx.innerHTML=`<span style="color:${RCOL[s.r]}">${'★'.repeat(s.r)}</span><br>${own?s.n:'？？？'}`;d.appendChild(tx);z.appendChild(d)});
+ $('zukanN').textContent=`（${got}/${all}）`}
+const GACHA_COST=4;
+function rollGacha(){if(myCrowns<GACHA_COST)return;const r=rnd()*100,tier=r<60?1:r<90?2:3;
+ const i=pick(SKINS.map((s,j)=>j).filter(j=>SKINS[j].r===tier));myCrowns-=GACHA_COST;const isNew=!myOwned.includes(i);if(isNew)myOwned.push(i);else myCrowns+=GACHA_COST/2;saveWallet();
+ const g=$('gachaRes');g.innerHTML='';const cv2=document.createElement('canvas');cv2.width=130;cv2.height=110;drawChar(cv2.getContext('2d'),62,100,i,0,0,0,0,0,2.4);g.appendChild(cv2);
+ const tx=document.createElement('div');tx.innerHTML=`<b style="color:${RCOL[SKINS[i].r]};font-size:16px">${RAR[SKINS[i].r]}</b><br><b style="font-size:20px">${SKINS[i].n}</b><br>${isNew?'<b style="color:#ff8">NEW！ スキンが使えるようになりました</b>':`もう持っていた… 王冠${GACHA_COST/2}個が戻りました`}`;g.appendChild(tx);renderShop()}
 function showLobby(){phase='lobby';showScreen('lobby');buildSkinGrid($('skinsL'),i=>{if(isHost){const me=LB.members.find(m=>m.pid===myPid);if(me){me.skin=i;lobbyBroadcast();renderLobby()}}else if(hostConn)hostConn.send({t:'skin',skin:i})});renderLobby()}
 function renderLobby(){
  $('lbCode').textContent=LB.solo?'ひとりモード':'部屋コード：'+LB.code;
@@ -541,6 +569,7 @@ function rrf(c,x,y,w,h,r){c.beginPath();if(c.roundRect)c.roundRect(x,y,w,h,r);el
 function circ(c,x,y,r){c.beginPath();c.arc(x,y,r,0,Math.PI*2);c.fill()}
 function drawChar(c,x,y,si,ang,st,el,ph,now,sc){
  const sk=SKINS[si]||SKINS[0];sc=sc||1;
+ if(sk.a){c.save();c.translate(x,y);drawAnimal(c,sk,Math.cos(ang),st,el,now/1000+ph,sc);c.restore();return}
  const dx=Math.cos(ang),dy=Math.sin(ang),side=Math.abs(dx)>Math.abs(dy)*0.8,back=!side&&dy<0,flip=dx<0;
  const t=now/1000+ph;let bob=0,lg=0;
  if(st===1){bob=Math.abs(Math.sin(t*9))*1.5;lg=Math.sin(t*9)}else if(st===2){bob=Math.abs(Math.sin(t*14))*2.5;lg=Math.sin(t*14)*1.6}
@@ -570,6 +599,74 @@ function drawChar(c,x,y,si,ang,st,el,ph,now,sc){
  if(fist&&!back)drawFist();
  if(st===4){c.fillStyle='#ffe25a';for(let i=0;i<3;i++){const a=t*4+i*2.1;circ(c,Math.cos(a)*9,hy-12+Math.sin(a)*3,1.8)}}
  c.restore();
+}
+function ell(c,x,y,rx,ry,col){c.fillStyle=col;c.beginPath();c.ellipse(x,y,Math.abs(rx),Math.abs(ry),0,0,Math.PI*2);c.fill()}
+function stars(c,x,y,t){for(let i=0;i<3;i++){const a=t*4+i*2.1;ell(c,x+Math.cos(a)*9,y+Math.sin(a)*3,1.8,1.8,'#ffe25a')}}
+function tri(c,x,y,w,h){c.beginPath();c.moveTo(x-w,y);c.lineTo(x,y-h);c.lineTo(x+w,y);c.closePath();c.fill()}
+function drawAnimal(c,sk,dx,st,el,t,sc){
+ c.scale(sc,sc);ell(c,0,0,15,4.5,'rgba(0,0,0,.22)');
+ let lg=0;if(st===1)lg=Math.sin(t*9);else if(st===2)lg=Math.sin(t*15)*1.4;
+ let ex=0;if(st===3){const p=el/PUNCH_T;ex=p<0.3?p/0.3:Math.max(0,1-(p-0.3)/0.7)}
+ if(st===4)c.rotate(Math.sin(t*10)*0.25);
+ if(dx<0)c.scale(-1,1);
+ const B=sk.size||1;c.scale(B,B);
+ const lh=sk.legH||10,by=-lh-5,A=sk.atk;
+ if(st===5){const p=Math.min(1,el/0.3);c.translate(0,by);c.rotate(p*Math.PI*0.95);c.translate(0,-by)}
+ if(ex){if(A==='bite'||A==='slam'||A==='head')c.translate(ex*7,0);
+  else if(A==='pounce')c.translate(ex*12,-Math.sin(ex*Math.PI)*12);
+  else if(A==='box'||A==='rear'){c.translate(-10,0);c.rotate(-0.65*ex);c.translate(10,0)}}
+ if(sk.bird){drawBird(c,sk,st,ex,lg);if(st===4)stars(c,6,-30,t);return}
+ const mv=st===1||st===2;
+ const hop=sk.hop&&mv?Math.abs(Math.sin(t*(st===2?12:8)))*5:0;
+ c.translate(0,-hop-(mv&&!sk.hop?Math.abs(lg)*0.8:0));
+ const L=(x,sw,col)=>{c.strokeStyle=col;c.lineWidth=3.4;c.lineCap='round';c.beginPath();c.moveTo(x,-lh-1);c.lineTo(x+sw,-1);c.stroke()};
+ const sw=sk.hop?0:lg*3.5,dark='rgba(0,0,0,.28)';
+ const tc=sk.tailc||sk.body,wag=Math.sin(t*(mv?10:3))*1.5;
+ if(sk.tail==='curl'){c.strokeStyle=tc;c.lineWidth=3.5;c.beginPath();c.arc(-12,by-6,3.5,0.5,Math.PI*1.9);c.stroke()}
+ else if(sk.tail==='long'){c.strokeStyle=tc;c.lineWidth=2.6;c.lineCap='round';c.beginPath();c.moveTo(-12,by);c.quadraticCurveTo(-20,by-4+wag,-17,by-13+wag);c.stroke()}
+ else if(sk.tail==='bush'){c.save();c.translate(-13,by-1);c.rotate(-0.45+wag*0.05);ell(c,-6,0,8.5,4,tc);if(sk.tailtip)ell(c,-12,0,3,2.8,sk.tailtip);c.restore()}
+ else if(sk.tail==='short')ell(c,-13,by-3,2.6,2.4,tc);
+ L(-7,-sw,sk.leg);L(-7,-sw,dark);L(10,sw,sk.leg);L(10,sw,dark);
+ ell(c,0,by,13,7.5,sk.body);ell(c,1,by+3.5,9,3.2,sk.belly);
+ if(sk.calico){ell(c,-5,by-2,5,4,'#e08a3c');ell(c,3,by-3.5,4,3,'#2a2622')}
+ if(sk.spots)for(const[a,b]of[[-6,-3],[-2,-4.5],[2,-3],[-4,-0.5],[5,-4.5]])ell(c,a,by+b,1.1,1.1,'#f4ead8');
+ if(sk.crescent){c.strokeStyle='#f0f0f0';c.lineWidth=2;c.beginPath();c.arc(10,by-2,4,0.3,Math.PI-0.3);c.stroke()}
+ let hx=12,hy=by-6;if(A==='head'){hx+=ex*4;hy+=ex*6}if(A==='bite')hx+=ex*3;
+ const hr=sk.hr||6,hc=sk.head||sk.body;
+ ell(c,8.5,by-3,5,5.5,sk.body);
+ if(sk.ear==='long'){c.save();c.translate(hx-2,hy-3);c.rotate(-0.4+(mv?Math.sin(t*8)*0.15:0));ell(c,0,-7,2.3,7.5,hc);ell(c,0,-7,1,5.5,'#e8b0a8');c.restore();c.save();c.translate(hx,hy-3);c.rotate(-0.25);ell(c,0,-7,2.3,7.5,hc);ell(c,0,-7,1,5.5,'#e8b0a8');c.restore()}
+ ell(c,hx,hy,hr,hr*0.9,hc);
+ if(sk.throat)ell(c,hx+1,hy+4,3.5,2.6,'#e8e4dc');
+ if(sk.mask)ell(c,hx+1.5,hy-0.5,3.8,2.7,'#3a2e26');
+ const sn=sk.sn||4,sx=hx+hr*0.6;
+ ell(c,sx+sn*0.5,hy+1.8,sn,2.8,sk.snoutCol||hc);ell(c,sx+sn*1.4,hy+0.8,1.4,1.2,'#141414');
+ if(A==='bite'&&ex>0.2){c.fillStyle='#5a1a1a';c.beginPath();c.moveTo(sx,hy+3);c.lineTo(sx+sn*1.7,hy+2+ex*3);c.lineTo(sx+sn*1.7,hy+5);c.closePath();c.fill()}
+ ell(c,hx+1.8,hy-1.2,1.2,1.4,'#111');ell(c,hx+2.2,hy-1.7,0.45,0.45,'#fff');
+ if(sk.tusk){c.strokeStyle='#f4f0e0';c.lineWidth=1.6;c.beginPath();c.moveTo(sx+sn*0.8,hy+3.5);c.quadraticCurveTo(sx+sn+2,hy+2,sx+sn+1,hy-1.5);c.stroke()}
+ if(sk.antler){c.strokeStyle='#d8c8a8';c.lineWidth=1.6;c.lineCap='round';c.beginPath();c.moveTo(hx-1,hy-4);c.lineTo(hx-3,hy-14);c.moveTo(hx-2,hy-8);c.lineTo(hx+2,hy-12);c.moveTo(hx-2.7,hy-11.5);c.lineTo(hx-6.5,hy-15);c.stroke()}
+ if(sk.horn){c.strokeStyle='#2a2826';c.lineWidth=1.9;c.lineCap='round';c.beginPath();c.moveTo(hx-0.5,hy-4);c.quadraticCurveTo(hx-2,hy-9.5,hx-5,hy-10.5);c.stroke()}
+ c.fillStyle=hc;
+ if(sk.ear==='point'){tri(c,hx-2.4,hy-hr*0.55,2.6,5.5);tri(c,hx+1.6,hy-hr*0.7,2.4,5)}
+ else if(sk.ear==='big'){tri(c,hx-2.6,hy-hr*0.55,3.3,8);tri(c,hx+2,hy-hr*0.7,3.1,7.5);c.fillStyle='#2a1a12';tri(c,hx-2.6,hy-hr*0.55-4.5,1.6,3.5);tri(c,hx+2,hy-hr*0.7-4,1.5,3.5)}
+ else if(sk.ear==='round'){ell(c,hx-3,hy-hr*0.75,2.5,2.5,hc);ell(c,hx+1.5,hy-hr*0.85,2.5,2.5,hc)}
+ L(-10,sw,sk.leg);
+ const paw=(ox,oy)=>{const px=ox+6+ex*9,py=by-2-ex*6+oy;c.strokeStyle=sk.leg;c.lineWidth=3.6;c.lineCap='round';c.beginPath();c.moveTo(ox,by+1+oy);c.lineTo(px,py);c.stroke();ell(c,px,py,2.7,2.7,sk.leg)};
+ if(ex&&(A==='swipe'||A==='box'||A==='rear')){paw(8,0);if(A==='box')paw(6,3)}else L(7,-sw,sk.leg);
+ if(st===4)stars(c,hx,hy-13,t);
+}
+function drawBird(c,sk,st,ex,lg){
+ const mv=st===1||st===2,bob=mv?Math.abs(lg)*1.2:0;
+ c.strokeStyle=sk.legc;c.lineWidth=1.6;c.beginPath();c.moveTo(-1,-6);c.lineTo(-1+lg*2.5,0);c.moveTo(2,-6);c.lineTo(2-lg*2.5,0);c.stroke();
+ c.translate(0,-bob);
+ c.fillStyle=sk.wing;c.beginPath();c.moveTo(-8,-13);c.lineTo(-17,-10);c.lineTo(-15,-7);c.lineTo(-7,-9);c.closePath();c.fill();
+ ell(c,0,-12,10,7.5,sk.body);
+ if((sk.atk==='wing'&&ex>0.05)||st===2){const f=sk.atk==='wing'&&ex?ex:0.6;c.fillStyle=sk.wing;c.beginPath();c.moveTo(-3,-15);c.lineTo(-11,-22-f*9);c.lineTo(-1,-20-f*4);c.lineTo(4,-16);c.closePath();c.fill()}
+ else{ell(c,-2,-12.5,7,4.5,sk.wing);if(sk.sheen){c.fillStyle='#3a3c48';c.fillRect(-6,-12,6,1.3);c.fillRect(-5,-10,6,1.3)}}
+ let hx=8+(mv?lg*1.5:0),hy=-18;if(ex){hx+=ex*6;hy+=ex*7}
+ if(sk.sheen){ell(c,5,-16,3.6,3.4,'#4f9a7a');ell(c,6,-14.5,3,2,'#8a5a9a')}
+ ell(c,hx,hy,5,4.6,sk.head);
+ c.fillStyle=sk.beak;c.beginPath();c.moveTo(hx+3.5,hy-1.8);c.lineTo(hx+(sk.bigBeak?11:8),hy+0.4);c.lineTo(hx+3.5,hy+2.2);c.closePath();c.fill();
+ ell(c,hx+1.5,hy-1,1.2,1.2,sk.bigBeak?'#444':'#d86a2a');ell(c,hx+1.6,hy-1,0.6,0.6,'#000');
 }
 function drawHouse(c,b,S,al){const[sx,sy]=S(b.x,b.y),fh=b.h*YS,hg=b.hgt;c.globalAlpha=al;
  c.fillStyle=b.wall;c.fillRect(sx,sy+fh-hg,b.w,hg);c.fillStyle='rgba(0,0,0,.15)';c.fillRect(sx,sy+fh-hg,b.w,7);
@@ -632,7 +729,7 @@ function frame(){requestAnimationFrame(frame);const now=performance.now(),dt=Mat
 $('ver').textContent='ver '+GAME_VERSION;
 $('inName').value=myName;$('inName').oninput=()=>{myName=cleanName($('inName').value);lsSet('mm_name',myName)};
 buildSkinGrid($('skinsT'));
-$('bShopT').onclick=openShop;$('bShopL').onclick=openShop;$('bShopBack').onclick=closeShop;updCrowns();
+$('bShopT').onclick=openShop;$('bShopL').onclick=openShop;$('bShopBack').onclick=closeShop;$('bGacha').onclick=rollGacha;updCrowns();
 $('bSolo').onclick=soloStart;$('bHost').onclick=hostRoom;$('bJoin').onclick=joinRoom;
 $('selMode').onchange=()=>{LB.mode=$('selMode').value;applyModeDef();lobbyBroadcast();renderLobby()};
 $('rngNpc').oninput=()=>{LB.npc=+$('rngNpc').value;lobbyBroadcast();renderLobby()};
