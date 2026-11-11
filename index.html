@@ -138,7 +138,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.17.1';
+const GAME_VERSION='0.18.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -205,7 +205,7 @@ function lsGet(k,d){try{const v=localStorage.getItem(k);return v==null?d:v}catch
 function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 
 // ================= マップ =================
-function isBlocked(m,x,y,mg){mg=mg==null?8:mg;if(x<16||y<16||x>W-16||y>H-16)return true;
+function isBlocked(m,x,y,mg){mg=mg==null?8:mg;if(x<16||y<16||x>W-16||y>H-16)return true;const z=m.zone;if(z&&(x<z.x1||x>z.x2||y<z.y1||y>z.y2))return true;
  for(const r of m.solid){if(x>r.x-mg&&x<r.x+r.w+mg&&y>r.y-mg*0.6&&y<r.y+r.h+mg*0.6)return true}return false}
 function genMap(seed){
  const R=mulberry(seed),r2=(a,b)=>a+R()*(b-a),pk=a=>a[Math.floor(R()*a.length)];
@@ -245,7 +245,15 @@ const MODES=[
  {id:'br',name:'バトルロイヤル',ready:1,desc:'全員が敵。パンチされたら脱落。最後の1人が勝ち！',
   def:{npc:40,time:300,respawn:null,npcOnHit:'stay',npcReact:'flee',refill:false,skinMode:'uniform',items:true},
   isEnemy:()=>true,
-  info:G=>`残り ${alive(G).length}人`,
+  setup(G){G.zone={x1:0,y1:0,x2:W,y2:H};G.map.zone=G.zone;G.zk=0;G.zNext=null},
+  tick(G,dt){const el=G.set.time-G.time,F=[1,.75,.55,.4,.28,.2,.14,.1],k=Math.floor((el+10)/60);
+   if(k>=1&&k<F.length&&G.zk<k&&!G.zNext){G.zk=k;G.zFrom={...G.zone};const f=G.zFrom,w=W*F[k],h=H*F[k],x1=rr(f.x1,f.x2-w),y1=rr(f.y1,f.y2-h);G.zNext={x1,y1,x2:x1+w,y2:y1+h};toastAll('⚠ 10秒後に移動できる範囲が狭くなる！')}
+   if(G.zNext){const t=clamp((el-G.zk*60)/8,0,1);if(t>0){for(const q of['x1','y1','x2','y2'])G.zone[q]=G.zFrom[q]+(G.zNext[q]-G.zFrom[q])*t;if(t>=1)G.zNext=null}}
+   const z=G.zone;for(const e of G.ents){if(e.x>=z.x1&&e.x<=z.x2&&e.y>=z.y1&&e.y<=z.y2)continue;
+    let nx=clamp(e.x,z.x1+10,z.x2-10),ny=clamp(e.y,z.y1+10,z.y2-10);
+    if(isBlocked(G.map,nx,ny)){let ok=false;for(let r=12;r<240&&!ok;r+=12)for(let a=0;a<8;a++){const x=nx+Math.cos(a*.785)*r,y=ny+Math.sin(a*.785)*r;if(!isBlocked(G.map,x,y)){nx=x;ny=y;ok=true;break}}if(!ok){const p=spawnPoint(false);nx=p.x;ny=p.y}}
+    e.x=nx;e.y=ny;if(!e.pid)e.aiT=0}},
+  info(G){const el=G.set.time-G.time;let z='';if(G.zNext&&el>=G.zk*60)z='　<span style="color:#ff7070">範囲縮小中！</span>';else{const n=G.zNext?G.zk*60:Math.ceil((el+0.01)/60)*60;if(n<G.set.time&&n/60<8)z=`　範囲縮小まで ${fmt(Math.ceil(n-el))}`}return`残り ${alive(G).length}人${z}`},
   check(G){const a=alive(G);if(active(G).length>1&&a.length<=1)return{title:a.length?`${a[0].name} の勝ち！`:'引き分け',lines:resLines(G),w:a.map(p=>p.pid)};return null},
   timeUp(G){const a=alive(G);return{title:'時間切れ！',lines:[`生き残り：${a.map(p=>p.name).join('、')||'なし'}`,...resLines(G)],w:a.map(p=>p.pid)}}},
  {id:'team',name:'チームバトル',ready:1,knowsMates:true,desc:'赤と青のチーム対決。味方は足元の輪で分かります。相手を10回倒すか、時間終了時に多い方の勝ち。味方をパンチすると自分がよろめきます。',
@@ -613,7 +621,7 @@ function sendSnaps(){
  for(const p of G.plist){if(p.cpu||p.left)continue;if(p.pid!==myPid&&!remote)continue;
   const e=G.em.get(p.eid);const mates=[];
   if(G.md.knowsMates)for(const q of G.plist)if(q!==p&&q.alive&&!G.md.isEnemy(G,p,q))mates.push(q.eid);
-  sendTo(p.pid,{t:'s',e:G.snapE,o:G.snapO,tm:Math.max(0,Math.ceil(G.time)),me:{id:p.alive?p.eid:0,alive:p.alive,item:p.item,cd:+p.cd.toFixed(1),stun:e&&e.st===ST.STAG?+(e.dur-e.stT).toFixed(1):0,role:p.role,team:p.team,mates,info:G.md.info(G,p),resp:p.respawnT>0?Math.ceil(p.respawnT):0,dx:p.deadX|0,dy:p.deadY|0,det:p.det?p.det.ids:0,...(G.md.meExtra?G.md.meExtra(G,p):{})}});
+  sendTo(p.pid,{t:'s',e:G.snapE,o:G.snapO,z:G.zone?[G.zone.x1|0,G.zone.y1|0,G.zone.x2|0,G.zone.y2|0]:0,zn:G.zNext?[G.zNext.x1|0,G.zNext.y1|0,G.zNext.x2|0,G.zNext.y2|0]:0,tm:Math.max(0,Math.ceil(G.time)),me:{id:p.alive?p.eid:0,alive:p.alive,item:p.item,cd:+p.cd.toFixed(1),stun:e&&e.st===ST.STAG?+(e.dur-e.stT).toFixed(1):0,role:p.role,team:p.team,mates,info:G.md.info(G,p),resp:p.respawnT>0?Math.ceil(p.respawnT):0,dx:p.deadX|0,dy:p.deadY|0,det:p.det?p.det.ids:0,...(G.md.meExtra?G.md.meExtra(G,p):{})}});
  }
 }
 function endGame(res){G.over=true;clearInterval(G.iv);
@@ -631,7 +639,7 @@ function onSnap(m){
   c.tx=a[i+1];c.ty=a[i+2];c.ang=a[i+3];if(c.st!==a[i+4]){c.st=a[i+4];c.st0=now}c.skin=a[i+5];seen.add(id)}
  for(const [id,c] of CL.ents)if(!seen.has(id)){CL.ents.delete(id);poof(c.x,c.y)}
  if(CL.first&&m.me){const me=CL.ents.get(m.me.id);if(me){CL.camX=me.x;CL.camY=me.y}}
- CL.objs=m.o;CL.tm=m.tm;CL.me=m.me;CL.first=false;updateHud();
+ CL.objs=m.o;CL.zone=m.z;CL.zn=m.zn;CL.tm=m.tm;CL.me=m.me;CL.first=false;updateHud();
 }
 function fmt(s){return Math.floor(s/60)+':'+String(s%60).padStart(2,'0')}
 function updateHud(){
@@ -865,6 +873,9 @@ function draw(dt,now){
    drawChar(c,a,b,e.skin,e.ang,e.st,(now-e.st0)/1000,e.ph,now,1.15)}])}
  L.sort((p,q)=>p[0]-q[0]);for(const d of L)d[1]();
  for(let i=0;i<o.length;i+=3){if(o[i]!==5)continue;const[a,b]=S(o[i+1],o[i+2]);for(let j=0;j<9;j++){const an=j*0.7+now/1500,r=j?50+Math.sin(j*3)*25:0;c.fillStyle='rgba(200,200,205,.55)';c.beginPath();c.ellipse(a+Math.cos(an)*r,b-30+Math.sin(an)*r*YS,55,42,0,0,7);c.fill()}}
+ if(CL.zone){const z=CL.zone,[a1,b1]=S(z[0],z[1]),[a2,b2]=S(z[2],z[3]);c.fillStyle='rgba(150,0,30,.35)';c.beginPath();c.rect(-50,-50,VW+100,VH+100);c.rect(a1,b1,a2-a1,b2-b1);c.fill('evenodd');
+  c.strokeStyle='#ff3a3a';c.lineWidth=3;c.strokeRect(a1,b1,a2-a1,b2-b1);
+  if(CL.zn){const n=CL.zn,[p1,q1]=S(n[0],n[1]),[p2,q2]=S(n[2],n[3]);c.setLineDash([12,8]);c.strokeStyle='#fff';c.lineWidth=2;c.strokeRect(p1,q1,p2-p1,q2-q1);c.setLineDash([])}}
  CL.parts=CL.parts.filter(p=>(p.t+=dt)<0.5);for(const p of CL.parts){const[a,b]=S(p.x,p.y);c.fillStyle=`rgba(240,240,240,${0.7-p.t*1.4})`;for(let j=0;j<5;j++){const an=j*1.26;circ(c,a+Math.cos(an)*p.t*40,b-16+Math.sin(an)*p.t*24,6+p.t*10)}}
  c.textAlign='center';
  for(const e of CL.ents.values()){if(!inV(e.x,e.y,40))continue;const[a,b]=S(e.x,e.y);
