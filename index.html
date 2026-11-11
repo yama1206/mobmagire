@@ -137,7 +137,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.15.1';
+const GAME_VERSION='0.15.2';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -640,7 +640,7 @@ function updateHud(){
 function toast(s){const t=$('toasts');while(t.children.length>3)t.firstChild.remove();const d=document.createElement('div');d.className='toast';d.textContent=s;t.appendChild(d);t.appendChild(document.createElement('br'));setTimeout(()=>{d.remove()},3000);setTimeout(()=>{if(t.lastChild&&t.lastChild.tagName==='BR'&&t.children.length&&t.firstChild.tagName==='BR')t.firstChild.remove()},3100)}
 function showResult(m){phase='result';showScreen('result');$('rsTitle').textContent=m.title;let cw='';if(m.crown){myCrowns++;saveWallet();cw=`<div style="font-size:20px;color:#ffd75e;margin:6px 0"><b>👑 王冠を1個手に入れた！（所持 ${myCrowns}個）</b></div>`}
  $('rsLines').innerHTML=cw+(m.lines||[]).join('<br>');
- $('bRsLobby').style.display=isHost?'':'none';$('rsWait').textContent=isHost?'':'ホストがロビーに戻るのを待っています…';$('touch').style.display='none'}
+ window.menuLockUntil=performance.now()+1500;$('rsWait').textContent=isHost?'':'次の試合はホストが始めます。ロビーで待っていてください';$('touch').style.display='none'}
 
 // ================= コントローラーの読み取り（全機種まとめて標準配置に変換） =================
 // 標準配置（standard）でないPS4/PS5コントローラー等も読めるよう変換し、つながっている全コントローラーの入力を合成する
@@ -890,8 +890,9 @@ $('rngNpc').oninput=()=>{LB.npc=+$('rngNpc').value;lobbyBroadcast();renderLobby(
 $('rngCpu').oninput=()=>{LB.cpu=+$('rngCpu').value;lobbyBroadcast();renderLobby()};
 $('selTime').onchange=()=>{LB.time=+$('selTime').value;lobbyBroadcast();renderLobby()};
 $('bStart').onclick=()=>{if(isHost)startGame()};
-$('bBack').onclick=toTitle;$('bRsTitle').onclick=toTitle;
-$('bRsLobby').onclick=()=>{if(isHost)hostToLobby()};
+const leaveAsk=()=>{if(peer&&!LB.solo&&!confirm(isHost?'部屋を閉じてタイトルへ戻りますか？（全員が退出になります）':'部屋から抜けてタイトルへ戻りますか？'))return;toTitle()};
+$('bBack').onclick=leaveAsk;$('bRsTitle').onclick=leaveAsk;
+$('bRsLobby').onclick=()=>{if(isHost)hostToLobby();else showLobby()};
 requestAnimationFrame(frame);
 </script>
 <script>
@@ -1082,7 +1083,7 @@ addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button'
   if(el.tagName==='INPUT'&&el.type==='range'){const st=+el.step||1,v=Math.max(+el.min,Math.min(+el.max,+el.value+d*st));if(v!==+el.value){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))}return true}
   return false}
  let gpAct=false;
- function activate(){const el=ensure();if(!el)return;
+ function activate(){if(performance.now()<(window.menuLockUntil||0))return;const el=ensure();if(!el)return;
   if(el.tagName==='SELECT'){adjust(el,1);return}
   if(el.tagName==='INPUT'){if(el.type!=='range'){el.focus();el.select&&el.select()}return}
   gpAct=true;try{el.click()}finally{gpAct=false}
