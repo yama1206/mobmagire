@@ -137,12 +137,12 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.16.0';
+const GAME_VERSION='0.17.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
 const ST={IDLE:0,WALK:1,RUN:2,PUNCH:3,STAG:4,DOWN:5};
-const ITEMS=['','変装セット','煙玉'];
+const ITEMS=['','変装セット','煙玉','探知レーダー'];const DET_T=6;
 const PEER_PREFIX='mobmagire-v1-';
 const CPU_NAMES=['ロボ太','ロボ子','メカ吉','ギア美','ボルト','ナット','チップ'];
 // NPC行動の初期設定（モードごとに上書き可）
@@ -491,6 +491,7 @@ function hostTick(){
  if(!G||G.over)return;const dt=1/30;G.tick++;G.time-=dt;G.snapE=null;
  for(const p of G.plist){
   if(p.left)continue;p.cd=Math.max(0,p.cd-dt);
+  if(p.det){p.det.t-=dt;if(p.det.t<=0||!p.alive)p.det=null}
   if(!p.alive){if(p.respawnT>0){p.respawnT-=dt;if(p.respawnT<=0)spawnPlayer(p)}continue}
   const e=G.em.get(p.eid);if(!e)continue;
   if(G.md.frozen&&G.md.frozen(G,p)){const ip=inputs[p.pid]||{};p.lastP=ip.p|0;p.lastA=ip.a|0;if(e.st!==ST.STAG&&e.st!==ST.DOWN)e.st=ST.IDLE;continue}
@@ -518,7 +519,7 @@ function controlEnt(p,e,inp,dt){
 }
 function doAction(p,e){
  if(G.md.interact&&G.md.interact(G,p,e))return;
- for(const b of G.objs.boxes)if(b.on&&dist(e,b)<30){b.on=false;b.t=25;p.item=1+ri(2);toastP(p,`${ITEMS[p.item]} を手に入れた！（Kで使う）`);return}
+ for(const b of G.objs.boxes)if(b.on&&dist(e,b)<30){b.on=false;b.t=25;p.item=1+ri(3);toastP(p,`${ITEMS[p.item]} を手に入れた！（Kで使う）`);return}
  if(p.item)useItem(p,e);
 }
 function useItem(p,e){
@@ -527,6 +528,11 @@ function useItem(p,e){
   for(const q of G.plist){if(q===p||!q.known.has(e.id))continue;const v=q.alive&&G.em.get(q.eid);if(!v||!canSee(v,e)){q.known.delete(e.id)}}
   toastP(p,`変装した！（${SKINS[e.skin].n}）`)}
  else if(it===2){G.objs.smokes.push({x:e.x,y:e.y,r:110,t:7});toastP(p,'煙玉を使った！')}
+ else if(it===3){// 探知：敵プレイヤー1人＋その近くのNPC2体を赤枠で表示（どれが本物かは分からない）
+  let tg=null,bd=1e9;for(const q of G.plist){if(q===p||!q.alive||q.left||!G.md.isEnemy(G,p,q))continue;const t=G.em.get(q.eid);if(!t)continue;const d=dist(e,t);if(d<bd){bd=d;tg=t}}
+  const c=tg||e,np=G.ents.filter(n=>!n.pid&&n.st!==ST.DOWN).sort((a,b)=>dist(a,c)-dist(b,c));
+  const near=np.slice(0,8).sort(()=>rnd()-.5).slice(0,tg?2:3);const ids=[...near.map(n=>n.id)];if(tg)ids.push(tg.id);ids.sort(()=>rnd()-.5);
+  p.det={ids,t:DET_T};if(p.cpu&&ids.length){p.ai.gt=pick(ids);p.ai.gtT=6}toastP(p,`探知レーダー！赤枠の3体のうち${tg?'1体が敵プレイヤー':'…敵プレイヤーは見つからなかった'}（${DET_T}秒）`)}
 }
 function updateState(e,dt){
  e.stT+=dt;if(e.pv>0)e.pv-=dt;
@@ -606,7 +612,7 @@ function sendSnaps(){
  for(const p of G.plist){if(p.cpu||p.left)continue;if(p.pid!==myPid&&!remote)continue;
   const e=G.em.get(p.eid);const mates=[];
   if(G.md.knowsMates)for(const q of G.plist)if(q!==p&&q.alive&&!G.md.isEnemy(G,p,q))mates.push(q.eid);
-  sendTo(p.pid,{t:'s',e:G.snapE,o:G.snapO,tm:Math.max(0,Math.ceil(G.time)),me:{id:p.alive?p.eid:0,alive:p.alive,item:p.item,cd:+p.cd.toFixed(1),stun:e&&e.st===ST.STAG?+(e.dur-e.stT).toFixed(1):0,role:p.role,team:p.team,mates,info:G.md.info(G,p),resp:p.respawnT>0?Math.ceil(p.respawnT):0,dx:p.deadX|0,dy:p.deadY|0,...(G.md.meExtra?G.md.meExtra(G,p):{})}});
+  sendTo(p.pid,{t:'s',e:G.snapE,o:G.snapO,tm:Math.max(0,Math.ceil(G.time)),me:{id:p.alive?p.eid:0,alive:p.alive,item:p.item,cd:+p.cd.toFixed(1),stun:e&&e.st===ST.STAG?+(e.dur-e.stT).toFixed(1):0,role:p.role,team:p.team,mates,info:G.md.info(G,p),resp:p.respawnT>0?Math.ceil(p.respawnT):0,dx:p.deadX|0,dy:p.deadY|0,det:p.det?p.det.ids:0,...(G.md.meExtra?G.md.meExtra(G,p):{})}});
  }
 }
 function endGame(res){G.over=true;clearInterval(G.iv);
@@ -863,6 +869,8 @@ function draw(dt,now){
  for(const e of CL.ents.values()){if(!inV(e.x,e.y,40))continue;const[a,b]=S(e.x,e.y);
   if(e===myE){c.fillStyle='#ffd84a';c.beginPath();c.moveTo(a-6,b-62);c.lineTo(a+6,b-62);c.lineTo(a,b-54);c.closePath();c.fill()}
   if(me&&me.vip&&e.id===me.vip){c.font='18px sans-serif';c.fillText('👑',a,e===myE?b-66:b-56)}}
+ if(me&&me.det){const bl=0.6+0.4*Math.sin(now/120);for(const id of me.det){const e=CL.ents.get(id);if(!e)continue;const[a,b]=S(e.x,e.y);
+  if(a>-10&&a<VW+10&&b>-10&&b<VH+10){c.strokeStyle=`rgba(255,40,40,${bl})`;c.lineWidth=3;c.strokeRect(a-17,b-58,34,62)}else edgeArrow(c,a,b,'#ff3030','?')}}
  for(let i=0;i<o.length;i+=3){if(o[i]!==11)continue;const e=CL.ents.get(o[i+1]);if(!e||!inV(e.x,e.y,40))continue;const[a,b]=S(e.x,e.y);drawObj(c,11,a,b-(e===myE?50:42),now)}
  if(me&&me.alive){let zi=0;for(let i=0;i<o.length;i+=3){const ty=o[i];const[a,b]=S(o[i+1],o[i+2]);
   if(ty>=6&&ty<=8){edgeArrow(c,a,b,ty===7?'#ff6060':ty===8?'#5f95ff':'#eee','ABC'[zi]);zi++}
