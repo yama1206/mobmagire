@@ -64,7 +64,7 @@ input[type=range]{padding:0;width:180px}
  <div id="status" class="status"></div>
  <div class="help">
   キーボード：移動 WASD/矢印　走る Shift　パンチ J/スペース　調べる・アイテム K/E<br>
-  コントローラー：左スティック移動　下ボタン/RT パンチ　右・左ボタン 調べる・アイテム　RB/LT 走る<br>
+  コントローラー：左スティック移動　下ボタン/RT パンチ　右・左ボタン 調べる・アイテム　RB/LT 走る<br>メニュー（コントローラー）：十字キー/スティックで選ぶ　Aで決定　Bでもどる　SELECT/STARTで音の設定<br>
   ・プレイヤーもNPCも同じ見た目。パンチできるのはプレイヤーだけ。<br>
   ・誰がパンチしたかは<b>自分の目で見て覚えて</b>ください。<br>
   ・NPCをパンチすると3秒よろめいて動けません。パンチされたプレイヤーは一撃でダウン。
@@ -111,7 +111,7 @@ input[type=range]{padding:0;width:180px}
 
 <script>
 'use strict';
-const GAME_VERSION='0.11.1';
+const GAME_VERSION='0.12.0';
 const VW=960,VH=600,YS=0.75,W=2000,H=1500;
 const VIEW_HX=VW/2+20,VIEW_HY=VH/YS/2+20;
 const WALK=72,RUN=150,PUNCH_CD=1.5,PUNCH_T=0.42,PUNCH_HIT=0.15,STUN_T=3,PUNCH_RANGE=36;
@@ -930,6 +930,77 @@ addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button'
   const al=CL.me&&CL.me.alive;if(al&&!prevAlive)SND.play('respawn');prevAlive=!!al};
  const _poof=poof;poof=function(x,y){_poof(x,y);SND.play('pop',vol(x,y)*.8,.06)};
  scene();
+})();
+</script>
+<style>.gpf{outline:3px solid #7fe0ff!important;outline-offset:2px;box-shadow:0 0 14px #7fe0ffaa!important}</style>
+<script>
+// ================= コントローラーでメニュー操作 =================
+// 十字キー/左スティック：押した方向にいちばん近い項目へ移動　A：決定　B：もどる　SELECT/START：音の設定
+(()=>{
+ let cur=null,curKey=null,lastC=null,show=false,held={},rep={},memo={},lastScr='';
+ const SEL='button,input,select,.skin';
+ function container(){const p=$('sndPanel');if(p&&p.style.display!=='none')return p;if(phase==='game')return null;return document.querySelector('.screen.on')}
+ function visible(el){if(el.disabled)return false;const r=el.getBoundingClientRect();if(!r.width||!r.height)return false;let e=el;while(e&&e!==document.body){if(getComputedStyle(e).display==='none')return false;e=e.parentElement}return true}
+ function items(){const c=container();return c?[...c.querySelectorAll(SEL)].filter(visible):[]}
+ const ctr=el=>{const r=el.getBoundingClientRect();return{x:r.left+r.width/2,y:r.top+r.height/2}};
+ function keyOf(el){if(el.id)return'#'+el.id;if(el.classList.contains('skin')&&el.dataset.i!=null)return(el.parentElement&&el.parentElement.id)+':'+el.dataset.i;return null}
+ function findKey(k,list){if(!k)return null;return list.find(e=>keyOf(e)===k)||null}
+ function setCur(el){if(cur&&cur!==el)cur.classList.remove('gpf');cur=el;if(!el)return;curKey=keyOf(el);lastC=ctr(el);
+  if(show){el.classList.add('gpf');el.scrollIntoView({block:'nearest',inline:'nearest'})}
+  const s=scrName();if(s)memo[s]=curKey}
+ function scrName(){const c=container();return c?c.id:''}
+ const DEF={title:['#bSolo'],lobby:['#bStart','#bBack'],shop:['#bGacha','#bGacha2','#bShopBack'],result:['#bRsLobby','#bRsTitle'],sndPanel:['#volBgm']};
+ // 今のカーソルを保つ（選択して画面が作り直されても、同じ項目か同じ位置の項目にとどまる）
+ function ensure(){const list=items();if(!list.length){if(cur)cur.classList.remove('gpf');cur=null;return null}
+  const s=scrName();
+  if(s!==lastScr){lastScr=s;const m=findKey(memo[s],list);if(m){setCur(m);return m}for(const k of DEF[s]||[]){const e=findKey(k,list);if(e){setCur(e);return e}}setCur(list[0]);return cur}
+  if(cur&&cur.isConnected&&list.includes(cur)){if(show&&!cur.classList.contains('gpf'))cur.classList.add('gpf');return cur}
+  let e=findKey(curKey,list);
+  if(!e&&lastC){let bd=1e9;for(const x of list){const c=ctr(x),d=Math.hypot(c.x-lastC.x,c.y-lastC.y);if(d<bd){bd=d;e=x}}}
+  setCur(e||list[0]);return cur}
+ // 押した方向にある項目のうち、いちばん近いものへ
+ function move(dx,dy){const c0=ensure();if(!c0)return;const list=items(),a=c0.getBoundingClientRect(),o=ctr(c0);let best=null,bs=1e9;
+  for(const el of list){if(el===c0)continue;const r=el.getBoundingClientRect(),c=ctr(el);
+   let pri,ort;
+   if(dx){pri=dx>0?r.left-a.right:a.left-r.right;if((c.x-o.x)*dx<=2)continue;ort=Math.abs(c.y-o.y)}
+   else{pri=dy>0?r.top-a.bottom:a.top-r.bottom;if((c.y-o.y)*dy<=2)continue;ort=Math.abs(c.x-o.x)}
+   const s=Math.max(pri,0)+ort*2.5;if(s<bs){bs=s;best=el}}
+  if(best){setCur(best);SND.play('click',.5,.03)}}
+ function adjust(el,d){if(el.tagName==='SELECT'){const n=el.options.length;if(!n)return;el.selectedIndex=(el.selectedIndex+d+n)%n;el.dispatchEvent(new Event('change',{bubbles:true}));SND.play('click',.6,.03);return true}
+  if(el.tagName==='INPUT'&&el.type==='range'){const st=+el.step||1,v=Math.max(+el.min,Math.min(+el.max,+el.value+d*st));if(v!==+el.value){el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}))}return true}
+  return false}
+ let gpAct=false;
+ function activate(){const el=ensure();if(!el)return;
+  if(el.tagName==='SELECT'){adjust(el,1);return}
+  if(el.tagName==='INPUT'){if(el.type!=='range'){el.focus();el.select&&el.select()}return}
+  gpAct=true;try{el.click()}finally{gpAct=false}
+  try{gpPrev=[true,true]}catch(e){}
+  setTimeout(ensure,0)}
+ function back(){const p=$('sndPanel');if(p&&p.style.display!=='none'){p.style.display='none';lastScr='';ensure();return}
+  if(phase==='game')return;if(shopOpen&&$('bShopBack')){$('bShopBack').click();setTimeout(ensure,0)}}
+ function toggleSnd(){$('sndBtn')&&$('sndBtn').click();lastScr='';setTimeout(ensure,0)}
+ // コントローラーで購入するときは確認ダイアログの代わりに「もう一度A」
+ const _cf=window.confirm.bind(window);let armed=null,armT=0;
+ window.confirm=function(msg){if(!gpAct)return _cf(msg);const el=cur,now=performance.now();if(armed===el&&now-armT<4000){armed=null;return true}
+  armed=el;armT=now;if(el&&el.tagName==='BUTTON'){const t=el.textContent;el.textContent='もう一度Ⓐで決定';setTimeout(()=>{if(el.isConnected&&armed===el){el.textContent=t;armed=null}},4000)}return false};
+ window.alert=function(s){try{setStatus(s)}catch(e){}};
+ // マウス・タッチを使ったらカーソル表示を消す
+ addEventListener('pointerdown',e=>{if(e.pointerType==='mouse'||e.pointerType==='touch'){show=false;if(cur)cur.classList.remove('gpf')}},true);
+ function poll(){requestAnimationFrame(poll);const gps=navigator.getGamepads?navigator.getGamepads():[];let g=null;for(const x of gps)if(x){g=x;break}if(!g)return;
+  const b=i=>!!(g.buttons[i]&&g.buttons[i].pressed),ax=g.axes[0]||0,ay=g.axes[1]||0;
+  const st={u:b(12)||ay<-.5,d:b(13)||ay>.5,l:b(14)||ax<-.5,r:b(15)||ax>.5,a:b(0),bk:b(1),sel:b(8)||b(9)};
+  const now=performance.now(),edge=k=>st[k]&&!held[k];
+  if(edge('sel')){held.sel=true;toggleSnd();return}
+  const c=container();
+  if(!c){for(const k in st)held[k]=st[k];if(cur){cur.classList.remove('gpf')}lastScr='';return}
+  const any=Object.values(st).some(v=>v);if(any&&!show){show=true;SND.unlock();ensure();if(cur)cur.classList.add('gpf')}
+  if(document.activeElement&&document.activeElement.tagName==='INPUT'&&document.activeElement.type!=='range'&&(st.u||st.d||st.l||st.r||st.bk))document.activeElement.blur();
+  for(const [k,dx,dy] of [['u',0,-1],['d',0,1],['l',-1,0],['r',1,0]]){
+   if(st[k]){const first=!held[k];if(first||now>=rep[k]){rep[k]=now+(first?320:110);const el=ensure();if(dx&&el&&adjust(el,dx)){}else move(dx,dy)}}}
+  if(edge('a'))activate();if(edge('bk'))back();
+  for(const k in st)held[k]=st[k];
+  if(show)ensure()}
+ requestAnimationFrame(poll);
 })();
 </script>
 </body></html>
